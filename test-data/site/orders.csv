@@ -1,0 +1,6 @@
+order_id,customer,region,amount,created_at
+1001,alice,us-east-1,120,2026-10-01T09:00:00Z
+1002,bob,ap-northeast-1,80,2026-10-01T09:05:00Z
+1003,carol,eu-west-1,250,2026-10-02T13:20:00Z
+1004,dave,us-west-2,45,2026-10-03T18:45:00Z
+1005,erin,ap-east-2,310,2026-10-04T02:10:00Z
