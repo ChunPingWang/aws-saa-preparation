@@ -1,0 +1,6 @@
+.DS_Store
+*.zip
+out*.json
+*.out
+.saa-lab-state
+__pycache__/
