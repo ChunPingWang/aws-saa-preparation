@@ -13,6 +13,9 @@ aws rds create-db-subnet-group --db-subnet-group-name "${PREFIX}-db-subnets" \
   --db-subnet-group-description "SAA lab private subnets" --subnet-ids "$PRI1" "$PRI2" >/dev/null
 
 log "建立 Multi-AZ DB instance（db.t3.micro、gp3 20GiB、不公開、密碼由 Secrets Manager 管理）"
+# 對照主控台要改的預設值：引擎 MySQL（主控台預設 Aurora PostgreSQL）、db.t3.micro（預設 db.m7g.large）、
+# gp3 20 GiB（預設 200 GiB）、不設 --max-allocated-storage＝關閉儲存自動擴展、
+# 不設 --monitoring-interval＝關閉 Enhanced Monitoring、備份保留 1 天、關閉刪除保護
 aws rds create-db-instance --db-instance-identifier "${PREFIX}-lab-mysql" \
   --engine mysql --db-instance-class db.t3.micro \
   --allocated-storage 20 --storage-type gp3 \

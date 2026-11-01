@@ -9,6 +9,8 @@ Q_ARN=$(aws sqs get-queue-attributes --queue-url "$Q_URL" --attribute-names Queu
 save_state Q_URL "$Q_URL"
 
 log "佇列存取政策：允許 SNS Topic 傳送訊息"
+# 主控台從 SQS 端「訂閱 Amazon SNS 主題」會自動加一段 Principal "*" + aws:SourceArn 條件；
+# 這裡用更嚴謹的 Principal = sns.amazonaws.com，效果相同。
 POLICY=$(cat <<JSON
 {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"sns.amazonaws.com"},
 "Action":"sqs:SendMessage","Resource":"$Q_ARN","Condition":{"ArnEquals":{"aws:SourceArn":"$TOPIC_ARN"}}}]}

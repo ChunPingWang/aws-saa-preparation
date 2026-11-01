@@ -2,7 +2,9 @@
 # Lab 12：KMS 客戶受管金鑰（加解密）+ Secrets Manager（檢視 RDS 受管密碼，不印出明文）
 source "$(dirname "$0")/00-env.sh"
 
-log "建立對稱 KMS 金鑰與別名 alias/${PREFIX}-lab-key"
+log "建立對稱 KMS 金鑰與別名 alias/${PREFIX}-lab-key，並啟用每年自動輪換"
+# CLI 不指定 --policy 時使用「預設金鑰政策」（只有 Enable IAM User Permissions 一段），
+# 由 IAM 政策決定誰能用；主控台精靈則另外把 saa-admin 寫成金鑰管理員與使用者。
 KEY_ID=$(aws kms create-key --description "SAA lab customer managed key" --query KeyMetadata.KeyId --output text)
 aws kms create-alias --alias-name "alias/${PREFIX}-lab-key" --target-key-id "$KEY_ID"
 aws kms enable-key-rotation --key-id "$KEY_ID"

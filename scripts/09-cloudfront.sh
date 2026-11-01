@@ -9,7 +9,9 @@ OAC_ID=$(aws cloudfront create-origin-access-control --origin-access-control-con
   --query OriginAccessControl.Id --output text)
 save_state OAC_ID "$OAC_ID"
 
-log "建立 Distribution（快取政策：Managed-CachingOptimized，強制 HTTPS）"
+log "建立 Distribution（快取政策：Managed-CachingOptimized，強制 HTTPS，DefaultRootObject=index.html）"
+# 主控台新精靈沒有「預設根物件」欄位，要建立後到「一般 → 設定 → 編輯」補 index.html；CLI 可直接帶入。
+# 主控台預設價格分級為「使用全部節點」；腳本用 PriceClass_100（北美＋歐洲）省錢，練習用途沒有差別。
 cat > /tmp/cf.json <<JSON
 {
   "CallerReference": "${PREFIX}-$(date +%s)",

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Lab 4：SG 串接（ALB SG → App SG）、Launch Template、Target Group、ALB、Auto Scaling Group
+# 與主控台流程相同：先建目標群組 → 獨立建立 ALB（掛 saa-alb-sg、轉送到 saa-app-tg）
+#                   → 啟動範本 → ASG「連接到現有的負載平衡器（目標群組）」
 source "$(dirname "$0")/00-env.sh"
 ROOT="$(dirname "$0")/.."
 
@@ -41,16 +43,16 @@ save_state ALB_ARN "$ALB_ARN"
 aws elbv2 create-listener --load-balancer-arn "$ALB_ARN" --protocol HTTP --port 80 \
   --default-actions "Type=forward,TargetGroupArn=$TG_ARN" >/dev/null
 
-log "Auto Scaling Group（私有子網路，min 2 / desired 2 / max 4，ELB 健康檢查）"
+log "Auto Scaling Group（私有子網路，min 2 / desired 2 / max 4，連接現有目標群組，EC2+ELB 健康檢查，寬限期 300 秒）"
 aws autoscaling create-auto-scaling-group --auto-scaling-group-name "${PREFIX}-app-asg" \
   --launch-template "LaunchTemplateName=${PREFIX}-app-lt,Version=\$Default" \
   --min-size 2 --max-size 4 --desired-capacity 2 \
   --vpc-zone-identifier "$PRI1,$PRI2" \
   --target-group-arns "$TG_ARN" --health-check-type ELB --health-check-grace-period 300
 
-log "目標追蹤擴展政策：平均 CPU 50%"
+log "目標追蹤擴展政策 Target Tracking Policy：平均 CPU 50%（與主控台預設名稱相同）"
 aws autoscaling put-scaling-policy --auto-scaling-group-name "${PREFIX}-app-asg" \
-  --policy-name "${PREFIX}-cpu50" --policy-type TargetTrackingScaling \
+  --policy-name "Target Tracking Policy" --policy-type TargetTrackingScaling \
   --target-tracking-configuration '{"PredefinedMetricSpecification":{"PredefinedMetricType":"ASGAverageCPUUtilization"},"TargetValue":50}' >/dev/null
 
 aws elbv2 wait load-balancer-available --load-balancer-arns "$ALB_ARN"
