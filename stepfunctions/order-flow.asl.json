@@ -1,0 +1,41 @@
+{
+  "Comment": "SAA Lab 15: order approval flow",
+  "StartAt": "CheckAmount",
+  "States": {
+    "CheckAmount": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.detail.amount",
+          "NumericGreaterThan": 100,
+          "Next": "ManualReview"
+        }
+      ],
+      "Default": "AutoApprove"
+    },
+    "ManualReview": {
+      "Type": "Wait",
+      "Seconds": 5,
+      "Next": "MarkManual"
+    },
+    "MarkManual": {
+      "Type": "Pass",
+      "Result": {
+        "decision": "manual-review"
+      },
+      "ResultPath": "$.review",
+      "Next": "Approved"
+    },
+    "AutoApprove": {
+      "Type": "Pass",
+      "Result": {
+        "decision": "auto-approved"
+      },
+      "ResultPath": "$.review",
+      "Next": "Approved"
+    },
+    "Approved": {
+      "Type": "Succeed"
+    }
+  }
+}
