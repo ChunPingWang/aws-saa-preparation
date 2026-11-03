@@ -1,14 +1,27 @@
 # AWS Certified Solutions Architect – Associate（SAA-C03）實作教學
 
-> 用 13 個循序漸進的 Lab（Lab 0–12），從 root 帳號建立管理員、IAM、VPC 一路做到 ALB + Auto Scaling、RDS Multi-AZ、Serverless、CloudFront、Route 53、SNS/SQS、KMS。
+> 用 17 個循序漸進的 Lab（Lab 0–16），從 root 帳號建立管理員、IAM、VPC 一路做到 ALB + Auto Scaling、RDS Multi-AZ、Serverless、CloudFront、Route 53、SNS/SQS、KMS，再補上 EBS/EFS、VPC Peering/NACL/Flow Logs、API Gateway/EventBridge/Step Functions、CloudTrail/Config/Athena/ECS Fargate。
 > 每個畫面都附上**實際操作時擷取的完整長截圖**（紅框編號對應步驟，帳號 ID 已遮蔽為 `123456789012`）、逐步說明、等效的 **AWS CLI 腳本**、**實務情境**、**延伸練習**與**考試重點**。
 
-- 實作日期：**2026-11-01**，區域 `us-east-1`（美國東部 – 維吉尼亞北部），主控台語系：繁體中文
-- 操作身分：Lab 0 用 **root**；Lab 1–12 一律用 IAM 使用者 **`saa-admin`**（詳見 [3. 身分與帳號規劃](#3-身分與帳號規劃)）
+- 實作日期：Lab 0–12 **2026-11-01**、Lab 13–16 **2026-11-04**（v3），區域 `us-east-1`（美國東部 – 維吉尼亞北部），主控台語系：繁體中文
+- 操作身分：Lab 0 用 **root**；Lab 1–16 一律用 IAM 使用者 **`saa-admin`**（詳見 [3. 身分與帳號規劃](#3-身分與帳號規劃)）
 - 全部資源完成後已清除（保留 `saa-admin`）；照著做一次的花費大約 **1–3 美元**（主要是 NAT 閘道、ALB、RDS Multi-AZ 的小時費）
 - AWS 主控台會持續改版，若畫面與截圖略有不同，請以欄位名稱與觀念為準
 
 ---
+
+## 本版更新（v3）
+
+v3 依 SAA-C03 考試指南的範圍與常見課程章節（EC2 儲存、進階 VPC、Serverless 整合、監控與治理、資料分析、容器）比對 v2 的缺口，新增 4 個 Lab，全部在 2026-11-04 於 us-east-1 主控台實際操作並截圖（68 張，紅框編號對應步驟）。
+
+| 新增 | 內容 | 補上的考試主題 |
+|---|---|---|
+| [Lab 13](#lab-13ebs快照ami-與-efs儲存) | EBS gp3 → 快照 → 跨 AZ 還原、AMI、EFS 兩個 AZ 同時掛載 | EBS 綁 AZ、快照區域性、AZ 名稱 vs AZ ID、EFS 區域性 / 生命週期 / 輸送量模式 |
+| [Lab 14](#lab-14vpc-peeringflow-logs-與-network-aclvpc-進階) | VPC Peering（申請 / 接受 / 雙向路由）、Flow Logs → CloudWatch Logs、NACL Deny | Peering 不可遞移、NACL 無狀態與規則順序、ACCEPT/REJECT 判讀 |
+| [Lab 15](#lab-15api-gatewayeventbridge-與-step-functionsserverless-進階) | REST API + Lambda Proxy、EventBridge 事件模式、Step Functions Choice/Wait | API 類型比較、節流、事件驅動、標準 vs 快速工作流程 |
+| [Lab 16](#lab-16cloudtrailconfigathena-與-ecs-fargate治理資料與容器) | CloudTrail 事件歷史、Config `restricted-ssh`、Athena 查 S3 CSV、ECS Fargate 執行 nginx | 稽核 vs 合規、Schema-on-Read 與掃描計費、任務角色 vs 執行角色 |
+
+其他更新：`scripts/13–16`、`scripts/98-cleanup-labs13-16.sh`（`99-cleanup.sh` 最後會自動呼叫）、`lambda/hello/`、`stepfunctions/order-flow.asl.json`、`athena/orders.sql`、練習題 Q26–Q37、踩坑 #25–#31、簡報新增 Lab 13–16 頁面。
 
 ## 本版更新（v2）
 
@@ -26,6 +39,7 @@
 
 ## 目錄
 
+- [本版更新（v3）](#本版更新v3)
 - [本版更新（v2）](#本版更新v2)
 - [0. 考試概要與學習地圖](#0-考試概要與學習地圖)
 - [1. 環境準備與費用控管](#1-環境準備與費用控管)
@@ -44,6 +58,10 @@
 - [Lab 10：Route 53 私有託管區域與 Alias](#lab-10route-53-私有託管區域與-alias)
 - [Lab 11：SNS → SQS 扇出解耦](#lab-11sns--sqs-扇出解耦)
 - [Lab 12：KMS 加解密與 Secrets Manager](#lab-12kms-加解密與-secrets-manager)
+- [Lab 13：EBS、快照、AMI 與 EFS（儲存）](#lab-13ebs快照ami-與-efs儲存)
+- [Lab 14：VPC Peering、Flow Logs 與 Network ACL（VPC 進階）](#lab-14vpc-peeringflow-logs-與-network-aclvpc-進階)
+- [Lab 15：API Gateway、EventBridge 與 Step Functions（Serverless 進階）](#lab-15api-gatewayeventbridge-與-step-functionsserverless-進階)
+- [Lab 16：CloudTrail、Config、Athena 與 ECS Fargate（治理、資料與容器）](#lab-16cloudtrailconfigathena-與-ecs-fargate治理資料與容器)
 - [Lab 99：清除資源](#lab-99清除資源)
 - [實作中踩到的坑（考試也愛考）](#實作中踩到的坑考試也愛考)
 - [考試情境速查表](#考試情境速查表)
@@ -67,10 +85,10 @@
 
 | 領域（考試指南權重） | 重點 | 對應 Lab |
 |---|---|---|
-| 1. 設計安全的架構（30%） | IAM、最小權限、SG/NACL、加密、Secrets | 0、1、3、5、9、12 |
-| 2. 設計具彈性的架構（26%） | Multi-AZ、ALB、Auto Scaling、解耦、DNS | 2、4、6、10、11 |
-| 3. 設計高效能架構（24%） | 快取、CDN、儲存類型、無伺服器 | 5、8、9 |
-| 4. 設計成本最佳化架構（20%） | 儲存分層、按需/保留、NAT 成本、Serverless | 2、5、8 |
+| 1. 設計安全的架構（30%） | IAM、最小權限、SG/NACL、加密、Secrets | 0、1、3、5、9、12、14、16 |
+| 2. 設計具彈性的架構（26%） | Multi-AZ、ALB、Auto Scaling、解耦、DNS | 2、4、6、10、11、13、15 |
+| 3. 設計高效能架構（24%） | 快取、CDN、儲存類型、無伺服器 | 5、8、9、13、15 |
+| 4. 設計成本最佳化架構（20%） | 儲存分層、按需/保留、NAT 成本、Serverless | 2、5、8、13、16 |
 
 ### 建議學習順序
 
@@ -83,6 +101,9 @@ flowchart LR
   D --> J[Lab10 Route 53]
   Z --> H[Lab8 Lambda+DynamoDB]
   E --> L[Lab12 KMS+Secrets]
+  A --> M[Lab13 EBS/AMI/EFS] --> N[Lab14 Peering/NACL/Flow Logs]
+  H --> O[Lab15 API GW/EventBridge/Step Functions]
+  Z --> P[Lab16 CloudTrail/Config/Athena/Fargate]
 ```
 
 ---
@@ -108,7 +129,7 @@ chmod +x scripts/*.sh
 | 做法 | 適合 | 說明 |
 |---|---|---|
 | **主控台逐步操作**（本文主軸） | 第一次學、想看懂每個選項 | 照著每個 Step 的截圖點選 |
-| **CLI 腳本** | 複習、想快速重建環境 | `scripts/00-admin-user.sh`（root 執行一次）→ `scripts/01-iam.sh` … `scripts/12-kms-secrets.sh` 依序執行 |
+| **CLI 腳本** | 複習、想快速重建環境 | `scripts/00-admin-user.sh`（root 執行一次）→ `scripts/01-iam.sh` … `scripts/16-governance-data.sh` 依序執行（Lab 13–16 使用預設 VPC，可獨立於 Lab 2–12 執行；Lab 13 需要 `saa-ec2-ssm-role`） |
 
 > 兩種做法擇一即可，不要混用同名資源（例如主控台已建了 `saa-lab-vpc`，就不要再跑 `02-vpc.sh`）。
 > 腳本會把資源 ID 存到 `~/.saa-lab-state`，後面的 Lab 會自動讀取；`99-cleanup.sh` 讀不到狀態檔時會改用資源名稱查找，所以主控台建立的資源也能清。
@@ -125,6 +146,10 @@ chmod +x scripts/*.sh
 | Secrets Manager | 每個機密每月 | RDS 託管密碼約 0.40 USD/月，隨 RDS 刪除 |
 | KMS 客戶受管金鑰 | 每月每把（按時間比例） | 刪除只能「排程」（7–30 天）；等待期間的計費方式請以 KMS 定價頁為準 |
 | Route 53 託管區域 | 每月每個 | 建立後 12 小時內刪除不收費 |
+| EBS gp3 / 快照 / EFS（Lab 13） | 每 GB-月 | 1 GiB 磁碟區與快照、EFS 幾 KB，做完當天刪除幾乎為 0；**AMI 的快照要另外刪** |
+| AWS Config（Lab 16） | 每個記錄的組態項目 + 每次規則評估 | 本教學只記錄 SG；「1-click 設定」記錄所有資源類型，帳號資源多時費用明顯 |
+| Athena（Lab 16） | 每 TB 掃描量（有最低計費量） | 本教學 0.27 KB |
+| ECS Fargate（Lab 16） | 每 vCPU-小時 + 每 GB-小時 | 0.25 vCPU / 0.5 GB，十幾分鐘不到 0.01 美元 |
 | CloudFront WAF（若啟用） | 每月 | 精靈預設啟用，畫面估計約 14 USD/月 → 本教學改為不啟用 |
 
 **建議**：先到 **Billing → Budgets** 建一個 5 美元的預算警示；做完當天就執行 [Lab 99](#lab-99清除資源)。
@@ -174,6 +199,10 @@ flowchart TB
 | Security Group | `saa-web-sg`、`saa-alb-sg`、`saa-app-sg`、`saa-db-sg` |
 | 運算 | `saa-web-01`、`saa-app-lt`、`saa-app-asg`、`saa-app-alb`、`saa-app-tg` |
 | 資料 | `saa-lab-site-<日期>-<代號>`（S3）、`saa-lab-mysql`（RDS）、`saa-db-subnets`（DB 子網路群組）、`saa-orders`（DynamoDB） |
+| Lab 13 | `saa-storage-sg`、`saa-storage-a` / `saa-storage-b`、`saa-data-vol` / `saa-data-vol-b`、`saa-data-snap`、`saa-storage-ami`、`saa-efs`（皆在預設 VPC） |
+| Lab 14 | `saa-peer-vpc`（10.20.0.0/16）、`saa-peer-subnet-public1-us-east-1a`、`saa-peer-rtb-public`、`saa-peer-sg`、`saa-peer-b`、`saa-default-to-peer`（Peering）、`saa-peer-nacl`、`saa-peer-flowlog` → `/saa/vpc-flow-logs`、`saa-flowlogs-role` |
+| Lab 15 | `saa-hello`（Lambda）、`saa-hello-api`（REST API，階段 `dev`）、`saa-order-flow`（Step Functions）、`saa-order-created-rule`（EventBridge） |
+| Lab 16 | `config-bucket-<帳號>`、規則 `restricted-ssh`、`saa-bad-ssh-sg`（示範用）、`saa-lab-athena-<帳號>`、Glue 資料庫 `saa_lab.orders`、`saa-ecs-cluster`、任務定義 `saa-nginx`、`saa-ecs-sg` |
 | 其他 | `saa-order-api`（Lambda）、`saa-alerts`（SNS）、`saa-asg-high-cpu`（警示）、`saa-order-queue`（SQS）、`saa.internal`（Route 53）、`alias/saa-lab-key`（KMS） |
 
 ### 本次實作的實際 ID（對照截圖用；你的帳號會不同）
@@ -195,6 +224,10 @@ flowchart TB
 | Route 53 私有區域 | `Z1009820L3HZVDFZ8PMZ` |
 | KMS 金鑰 | `a7efc158-55aa-409d-9380-7e48419f9268` |
 | RDS 託管機密 | `rds!db-1402a6e3-ca0f-4ba8-bc24-e3a3393d8c67` |
+| Lab 13 | 預設 VPC `vpc-06c8ce0a3b085ebae`、`saa-storage-a` `i-028de14b85d34f75e`（1a）、`saa-storage-b` `i-02e8524c751113638`（1b）、磁碟區 `vol-0469157e086aa9cf5` / `vol-00cc75a69328cb7a4`、快照 `snap-00a185fccbbe4b541`、AMI `ami-00cc424353c263e5d`、EFS `fs-0859ca7535456cd12` |
+| Lab 14 | `saa-peer-vpc` `vpc-02d6349747a45724f`、Peering `pcx-00880416443e4a1a0`、`saa-peer-b` `i-090e32040e4b1abb6`（10.20.6.241）、NACL `acl-05f6d768e3f6adefe`、Flow Log `fl-0e6eb668c4c20b07d` |
+| Lab 15 | REST API `db8opqi0ql`、部署 `u7178z` |
+| Lab 16 | Fargate 任務 `a8d1033c143947f1ab11986a356ae0ae`（172.31.71.61 / 44.221.43.184）、`saa-bad-ssh-sg` `sg-030848afb4bdd0220` |
 
 ---
 
@@ -2664,6 +2697,1153 @@ curl -s https://<bucket>.s3.us-east-1.amazonaws.com/index.html                # 
 
 ---
 
+## Lab 13：EBS、快照、AMI 與 EFS（儲存）
+
+> **本 Lab 操作身分與環境**
+>
+> | 項目 | 內容 |
+> |---|---|
+> | 操作身分 | IAM 使用者 **`saa-admin`**（群組 `saa-admins`，AdministratorAccess） |
+> | 登入方式 | IAM 使用者登入 URL → `saa-admin` → 密碼 → MFA |
+> | 區域 | **us-east-1**，使用**預設 VPC**（172.31.0.0/16），不依賴 Lab 2 的 `saa-lab-vpc` |
+> | 前置條件 | Lab 1 的角色 `saa-ec2-ssm-role`（已清除的話先跑 `scripts/01-iam.sh` 或在 CloudShell 重建）；SG `saa-storage-sg`（只允許「自己」連 NFS 2049）；EC2 `saa-storage-a`（t3.micro、us-east-1a） |
+> | 預估時間 / 費用 | 約 40 分鐘 / 2 台 t3.micro + gp3 1 GiB ×2 + 快照 + EFS，做完當天清除約 0.1 美元 |
+
+**目標**：把「區塊儲存 vs 檔案儲存」實際做一遍。EBS 磁碟區**綁定單一 AZ**，要搬到另一個 AZ 只能透過**快照**（區域性、存在 S3）；AMI 是「快照 + 啟動設定」的組合；EFS 是**區域性**檔案系統，兩個 AZ 的 EC2 可以**同時**掛載、讀寫同一份資料。
+
+```mermaid
+flowchart LR
+  subgraph AZA[us-east-1a]
+    A[saa-storage-a] --- V1[(EBS saa-data-vol<br/>gp3 1 GiB)]
+    MTA[EFS 掛載目標<br/>172.31.9.54]
+  end
+  subgraph AZB[us-east-1b]
+    B[saa-storage-b<br/>由 AMI 啟動] --- V2[(EBS saa-data-vol-b<br/>由快照還原)]
+    MTB[EFS 掛載目標<br/>172.31.91.94]
+  end
+  V1 -->|建立快照| SNAP[(快照 saa-data-snap<br/>區域性)]
+  SNAP -->|在 1b 建立磁碟區| V2
+  A -->|建立映像| AMI[AMI saa-storage-ami] -->|啟動| B
+  A -. NFS 2049 .-> MTA
+  B -. NFS 2049 .-> MTB
+  MTA --- EFS[(EFS saa-efs<br/>區域性)]
+  MTB --- EFS
+```
+
+> 執行個體與 SG 這次用 CloudShell 建立（啟動精靈在 Lab 3 已完整截圖），主控台截圖集中在 EBS / 快照 / AMI / EFS 的操作。等效指令見本 Lab 最後的 CLI 等效。
+
+### Step 13-1　建立 EBS 磁碟區 saa-data-vol
+
+**進入路徑**：EC2 →「Elastic Block Store」→「磁碟區」→「建立磁碟區」
+
+![建立磁碟區](images/lab13-01-create-volume.jpg)
+
+1. 磁碟區類型「一般用途 SSD (gp3)」（預設）。
+2. 容量 **1 GiB**（預設帶 100 GiB，記得改；gp3 最小 1 GiB、最大 64 TiB）。
+3. IOPS **3000**、輸送量 **125 MiB/s**：gp3 的**基準值，不論容量大小都免費附帶**；需要更多再另外加購（上限 80,000 IOPS / 2,000 MiB/s）。gp2 則是 IOPS 隨容量成長（每 GiB 3 IOPS），這是考試常比較的點。
+4. 可用區域顯示為「**use1-az1 (us-east-1a)**」：新版主控台同時顯示 **AZ ID** 與 AZ 名稱（見 Step 13-7）。磁碟區只能連接到**同一個 AZ** 的執行個體，所以要選 `saa-storage-a` 所在的 1a。
+5. 勾選「加密此磁碟區」後，KMS 金鑰欄位**一開始是空的**，要手動選「(預設) aws/ebs」（帳戶層級若已開啟「預設加密」則會自動勾選）。下方說明：從加密快照建立的磁碟區會自動加密。
+6. 標籤 `Name = saa-data-vol`。
+7. 按「建立磁碟區」→ `vol-0469157e086aa9cf5`，狀態「正在建立」→「可用」。
+
+### Step 13-2　連接磁碟區到 saa-storage-a
+
+**進入路徑**：選取 `saa-data-vol` →「動作」→「連接磁碟區」（磁碟區還在「正在建立」時此選項是灰的）
+
+![連接磁碟區](images/lab13-02-attach-volume.jpg)
+
+1. 可用區域 use1-az1 (us-east-1a)：只列得出同 AZ 的執行個體。
+2. 執行個體選 `i-028de14b85d34f75e (saa-storage-a) (running)`。
+3. 裝置名稱 `/dev/sdf`（建議資料磁碟區用 `/dev/sd[f-p]`，根磁碟區是 `/dev/xvda`）。
+4. 說明：Nitro 執行個體的 Linux 核心會把它命名為 **NVMe 裝置**（下一步看到的是 `/dev/nvme1n1`，不是 `/dev/sdf`）。
+5. 按「連接磁碟區」。
+
+### Step 13-3　Session Manager：格式化、掛載、寫入測試檔
+
+**進入路徑**：Systems Manager → Session Manager → 啟動工作階段 → `saa-storage-a`（或 EC2 →「連線」→「Session Manager」）
+
+![格式化與掛載](images/lab13-03-mkfs-mount.jpg)
+
+```bash
+sudo -i
+lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT,SERIAL
+mkfs -t xfs /dev/nvme1n1 && mkdir -p /data && mount /dev/nvme1n1 /data
+echo "hello from EBS in us-east-1a $(date -u +%FT%TZ)" > /data/hello.txt && sync
+df -h /data && cat /data/hello.txt
+```
+
+1. `nvme0n1` 8G 是根磁碟區（`/`），SERIAL `vol0c32cb331b01b1d6a`。
+2. `nvme1n1` 1G、SERIAL **`vol0469157e086aa9cf5`**：SERIAL 就是磁碟區 ID（少了連字號），用它確認裝置對應到哪個 EBS。
+3. 建立 XFS 檔案系統、掛載到 `/data`、寫入一行文字。
+4. `df -h` 顯示 960M 可用；`hello.txt` 內容含寫入時間 `2026-11-03T16:18:59Z`。
+
+> 這裡沒有寫 `/etc/fstab`，所以重新開機後 `/data` 不會自動掛載（Step 13-6 建立 AMI 時預設會重開機，事後確實就沒有掛回來）。正式環境請用 `UUID=... /data xfs defaults,nofail 0 2` 寫入 fstab。
+
+### Step 13-4　建立快照 saa-data-snap
+
+**進入路徑**：EC2 →「快照」→「建立快照」（或在磁碟區「動作」→「建立快照」）
+
+![建立快照](images/lab13-04-create-snapshot.jpg)
+
+1. 資源類型「磁碟區」（另一個選項「執行個體」會一次替**所有連接的磁碟區**建立「多重磁碟區快照」，時間點一致，適合資料庫多顆磁碟）。
+2. 磁碟區 ID `vol-0469157e086aa9cf5 (saa-data-vol)`，顯示 use1-az1。
+3. 描述 `saa data snapshot`。
+4. 加密「已加密」：加密磁碟區的快照一定是加密的（不能選）。
+5. 標籤 `Name = saa-data-snap`。
+6. 按「建立快照」→ `snap-00a185fccbbe4b541`。
+
+> 快照是**增量**的：第一次完整複製，之後只存變更的區塊；儲存在 S3（看不到 Bucket），屬於**區域性**資源，可以複製到其他區域做 DR。
+
+### Step 13-5　建立映像（AMI）前：預設會把所有磁碟區都包進去
+
+**進入路徑**：EC2 →「執行個體」→ 選 `saa-storage-a` →「動作」→「映像和範本」→「建立映像」→ 往下捲到「執行個體磁碟區」，表格往右捲
+
+![AMI 磁碟區預設](images/lab13-05-ami-volumes-default.jpg)
+
+1. 預設列出 `/dev/sdf`（資料磁碟區）與 `/dev/xvda`（根）兩列：AMI 預設會替**所有連接的 EBS** 建快照。根磁碟區「在終止時刪除」**已啟用**、資料磁碟區**未啟用**（這就是為什麼終止 EC2 後資料磁碟區還在、要另外刪）。
+2. 本 Lab 只要根磁碟區，按 `/dev/sdf` 那一列右邊的 **×** 移除。
+
+### Step 13-6　建立映像 saa-storage-ami
+
+![建立映像](images/lab13-06-create-image.jpg)
+
+1. 映像名稱 `saa-storage-ami`（建立後無法修改）。
+2. 描述 `AL2023 root volume from saa-storage-a`。
+3. 「**重新啟動執行個體**」預設勾選：先重開機，讓檔案系統處於靜止狀態再建快照，確保一致性；取消勾選（`--no-reboot`）則不停機但可能不一致。
+4. 執行個體磁碟區只剩 `/dev/xvda` 8 GiB。
+5. 說明：建立過程中會替上述每個磁碟區建立快照。
+6. 按「建立映像」→ `ami-00cc424353c263e5d`，狀態「待處理」→「可用」。
+
+### Step 13-7　AZ 名稱與 AZ ID
+
+**進入路徑**：建立磁碟區頁的「可用區域」下拉選單
+
+![AZ 名稱與 ID](images/lab13-07-az-name-vs-id.jpg)
+
+1. `use1-az1 (us-east-1a)`、2. `use1-az2 (us-east-1b)`，其餘：1c = use1-az4、1d = use1-az6、1e = use1-az3、1f = use1-az5。
+
+> **AZ 名稱（us-east-1a）在每個帳號是隨機對應的**，AZ ID（use1-az1）才是實體位置。跨帳號共用子網路（RAM）、PrivateLink、規劃「兩個帳號放在同一實體 AZ 以降低延遲」時要用 **AZ ID** 比對。
+
+### Step 13-8　由快照在 us-east-1b 建立磁碟區 saa-data-vol-b
+
+**進入路徑**：EC2 →「磁碟區」→「建立磁碟區」
+
+![由快照建立磁碟區](images/lab13-08-volume-from-snapshot-1b.jpg)
+
+1. 容量 **1 GiB**（同樣要把預設的 100 改掉；不能小於快照大小）。
+2. 可用區域 **use1-az2 (us-east-1b)**：快照是區域性的，可以還原到**任何 AZ**——這就是 EBS 跨 AZ 搬移的唯一方法。
+3. 快照 ID：下拉選單會列出很多公開／AWS 的快照，搜尋 ID 也不一定找得到；改選最上方「**指定自訂 snapshotid…**」貼上 `snap-00a185fccbbe4b541`。
+4. 新欄位「快速快照還原」（FSR，未啟用；啟用後還原的磁碟區一建立就是滿效能）與「**磁碟區初始化速率**」（新功能，可指定 100–300 MiB/s 從 S3 下載區塊的速度，額外付費）。沒設定的話，從快照還原的磁碟區第一次讀取每個區塊時會比較慢（lazy loading）。
+5. 加密：**自動勾選且無法取消**（來源快照已加密），KMS 金鑰沿用 aws/ebs。
+6. 標籤 `Name = saa-data-vol-b`。
+7. 按「建立磁碟區」→ `vol-00cc75a69328cb7a4`。
+
+### Step 13-9　AMI 清單：由我擁有
+
+**進入路徑**：EC2 →「映像」→「AMI」→ 篩選「由我擁有」
+
+![AMI 清單](images/lab13-09-ami-owned.jpg)
+
+1. `saa-storage-ami`（`ami-00cc424353c263e5d`）。
+2. 「從 AMI 啟動執行個體」。
+3. 映像類型 machine、根裝置類型 **EBS**（另一種是 instance store-backed）。
+4. 擁有者帳戶 ID 是自己：預設私有，可在「許可」分頁分享給特定帳號或組織，或用「複製 AMI」複製到其他區域。
+
+### Step 13-10　由 AMI 在 us-east-1b 啟動 saa-storage-b
+
+**進入路徑**：上一步按「從 AMI 啟動執行個體」（AMI 已自動帶入）
+
+![由 AMI 啟動](images/lab13-10-launch-from-ami.jpg)
+
+1. 名稱 `saa-storage-b`、執行個體類型 t3.micro。
+2. 金鑰對「在沒有金鑰對的情況下繼續（不建議）」：用 Session Manager 連線，不需要 SSH 金鑰。這個下拉選單第一次點選可能沒套用，送出前再確認一次。
+3. 網路設定 →「編輯」→ 子網路選 **us-east-1b** 的 `subnet-07c5c67b0c1abb628`（use1-az2，172.31.80.0/20）。預設 VPC 的子網路會自動指派公有 IP。
+4. 防火牆選「選取現有的安全群組」→ `saa-storage-sg`。
+5. 設定儲存：根磁碟區 8 GiB gp3、「**未加密**」：AMI 的快照來自未加密的根磁碟區，所以由它啟動的磁碟區也是未加密（可在「進階」改成加密）。
+6. 「檔案系統」區塊可以直接在啟動時掛載 **EFS / FSx**，還多了一個「**S3 Files - 新**」選項；本 Lab 選「無」，之後手動掛載 EFS 以便看懂指令。
+7. 摘要的軟體映像顯示 `ami-00cc424353c263e5d`。進階詳細資訊的「IAM 執行個體設定檔」選 `saa-ec2-ssm-role` → 按「啟動執行個體」→ `i-02e8524c751113638`。
+
+接著在 CloudShell 把還原的磁碟區連接到 `saa-storage-b`（與 Step 13-2 相同，只是換成 1b 的執行個體）：
+
+```bash
+VB=$(aws ec2 describe-volumes --filters Name=tag:Name,Values=saa-data-vol-b --query 'Volumes[0].VolumeId' --output text)
+aws ec2 attach-volume --volume-id $VB --instance-id i-02e8524c751113638 --device /dev/sdf
+```
+
+### Step 13-11　建立 EFS：快速建立的預設值
+
+**進入路徑**：Amazon EFS →「建立檔案系統」
+
+![EFS 建議設定](images/lab13-11-efs-create-quick.jpg)
+
+1. 名稱 `saa-efs`。
+2. VPC：預設 VPC。
+3. 建議設定：輸送量模式「**彈性**」、30 天沒存取轉到 **IA**、90 天轉到「**存檔**」（Archive）、「轉換至標準」無。
+4. 自動備份「已啟用」、加密「已啟用」（**建立後無法變更**）。
+5. 按「**自訂**」（不用快速建立，因為要指定掛載目標的 SG）。
+
+### Step 13-12　EFS 步驟 1：檔案系統設定
+
+![EFS 設定](images/lab13-12-efs-settings.jpg)
+
+1. 檔案系統類型「**區域性**」（跨多個 AZ 儲存，最高可用性）；另一個「單區域」（One Zone，便宜約一半，只在一個 AZ）。
+2. 取消「啟用自動備份」（練習用，避免產生 AWS Backup 費用）→ 主控台顯示警告「建議您為檔案系統建立備份政策」。
+3. 生命週期管理：轉換至 IA 30 天、轉換為「存檔」90 天、轉換至標準「無」（也可設成「第一次存取時」移回標準）。
+4. 加密：啟用靜態資料加密（aws/elasticfilesystem）；傳輸中加密靠掛載時的 TLS 或檔案系統政策強制。
+5. 效能設定：「加強型」下的「**彈性**（建議）」，依實際用量計費；「佈建」預先購買輸送量；另一大類「爆量」依儲存量累積額度。
+6. 按「下一步」。
+
+### Step 13-13　EFS 步驟 2：掛載目標
+
+![EFS 掛載目標](images/lab13-13-efs-mount-targets.jpg)
+
+1. VPC：預設 VPC。
+2. 主控台預設在**每個 AZ（6 個）**各建一個掛載目標、而且都套用 `default` SG；本 Lab 只留 us-east-1a（`subnet-07fc08afb088c768f`）……
+3. ……並把 SG 改成 `saa-storage-sg`。
+4. 第二個掛載目標 us-east-1b（`subnet-07c5c67b0c1abb628`）……
+5. ……SG 同樣改成 `saa-storage-sg`；1c–1f 按「移除」。
+6. 按「下一步」→ 步驟 3 檔案系統政策（選用，跳過）→ 步驟 4 檢閱 →「建立」→ `fs-0859ca7535456cd12`。
+
+> `saa-storage-sg` 的入站規則只有一條：**TCP 2049，來源 = saa-storage-sg 自己**。EC2 與掛載目標掛同一個 SG，彼此就能用 NFS 溝通，不必寫死 IP 或開放整個 VPC CIDR。
+
+### Step 13-14　EFS「連接」：掛載指令
+
+**進入路徑**：EFS → `saa-efs` → 右上「連接」
+
+![EFS 掛載指令](images/lab13-14-efs-attach-commands.jpg)
+
+1. 「透過 DNS 掛載」（另一個「透過 IP 掛載」適用於 DNS 不可用的環境，例如跨 VPC Peering）。
+2. 使用 **EFS 掛載協助程式**（amazon-efs-utils）：`sudo mount -t efs -o tls fs-0859ca7535456cd12:/ efs`，`-o tls` 開啟傳輸中加密。
+3. 使用 **NFS 用戶端**：`mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport <fs-id>.efs.us-east-1.amazonaws.com:/ efs`。AL2023 內建 nfs-utils，本 Lab 用這個方式。
+
+### Step 13-15　saa-storage-b：讀到 1a 寫的 EBS 資料
+
+**進入路徑**：Session Manager → `saa-storage-b`
+
+![1b 讀取還原磁碟區](images/lab13-15-restore-in-1b.jpg)
+
+```bash
+sudo -i
+curl -s -H "X-aws-ec2-metadata-token: $(curl -s -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')" \
+  http://169.254.169.254/latest/meta-data/placement/availability-zone; echo
+lsblk -o NAME,SIZE,FSTYPE,SERIAL
+mkdir -p /data && mount /dev/nvme1n1 /data && cat /data/hello.txt
+```
+
+1. IMDSv2 查到這台在 **us-east-1b**。
+2. `nvme1n1` 1G **xfs**、SERIAL `vol00cc75a69328cb7a4`：還原的磁碟區已經有檔案系統（不需要也**不能**再 mkfs，否則資料會被清掉）。
+3. 讀到 `hello from EBS in us-east-1a 2026-11-03T16:18:59Z`：1a 的資料透過快照搬到了 1b。
+
+### Step 13-16　saa-storage-b 掛載 EFS 並寫入
+
+![1b 掛載 EFS](images/lab13-16-efs-mount-b.jpg)
+
+```bash
+EFS=us-east-1b.fs-0859ca7535456cd12.efs.us-east-1.amazonaws.com
+mkdir -p /efs && mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport $EFS:/ /efs
+echo "written by saa-storage-b in us-east-1b" > /efs/shared.txt && df -hT /efs && ls -l /efs
+```
+
+1. AZ 專屬的 DNS 名稱 `us-east-1b.fs-….efs.us-east-1.amazonaws.com` 解析到 1b 掛載目標 **172.31.91.94**。
+2. `df` 顯示 `nfs4`、大小 **8.0E**（EB）：EFS 沒有容量上限，用多少付多少。
+3. `shared.txt` 寫入成功。
+
+> **實作時的觀察（照實記錄）**：掛載目標還在「creating」時就先在 `saa-storage-b` 嘗試掛載，通用名稱 `fs-0859ca7535456cd12.efs.us-east-1.amazonaws.com` 回 `Failed to resolve server … Name or service not known`。等掛載目標變成 available 後，這台**仍持續解析失敗**（推測是先前的查詢失敗被快取），改用 **AZ 專屬名稱**就立即成功；另一台 `saa-storage-a` 從沒提早查過，通用名稱一開始就正常解析（見下一步）。建議：先確認掛載目標狀態是 available 再掛載；遇到解析失敗可先改用 AZ 專屬名稱或 IP。
+
+### Step 13-17　saa-storage-a 讀到 1b 寫的內容（共享檔案系統）
+
+![1a 讀取 EFS](images/lab13-17-efs-shared-a.jpg)
+
+```bash
+getent hosts fs-0859ca7535456cd12.efs.us-east-1.amazonaws.com
+EFS=us-east-1a.fs-0859ca7535456cd12.efs.us-east-1.amazonaws.com
+mkdir -p /efs && mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport $EFS:/ /efs
+cat /efs/shared.txt && echo 'and appended by saa-storage-a in us-east-1a' >> /efs/shared.txt
+mount | grep -E '/efs|/data'; cat /efs/shared.txt
+```
+
+1. 在 1a 解析**通用名稱**得到 **172.31.9.54**：VPC 的 DNS 會把它解析成「**同一個 AZ**」的掛載目標，避免跨 AZ 流量。
+2. 讀到 `written by saa-storage-b in us-east-1b`。
+3. `mount` 只列出 `/efs`（`addr=172.31.9.54`），**沒有 `/data`**：Step 13-6 建立 AMI 時重開機，未寫 fstab 的 EBS 掛載就消失了。
+4. 兩台在不同 AZ 同時讀寫同一個檔案——這是 EBS 做不到、EFS 的價值所在。
+
+### CLI 等效
+
+```bash
+./scripts/13-ebs-efs.sh
+```
+
+### 實務情境
+
+- **銀行**：核心系統資料庫的 EBS 每天用 **Data Lifecycle Manager** 或 AWS Backup 排程快照，並跨區域複製到 DR 區域；快照用客戶受管 KMS 金鑰加密，分享給 DR 帳號時要一併授權金鑰。
+- **製造**：MES 的多台應用伺服器要共用配方檔、圖檔 → EFS（Linux）或 FSx for Windows（SMB）；不常用的歷史檔由生命週期自動轉 IA / Archive 降低成本。
+- **零售**：促銷前用「黃金 AMI」（已裝好應用與代理程式）放進啟動範本，ASG 擴展時幾十秒就能上線；AMI 搭配 EC2 Image Builder 每月自動修補重建。
+
+### 延伸練習
+
+1. 把 `saa-data-vol` 的類型從 gp3 改成 io2、容量改成 2 GiB（Elastic Volumes，不必卸離），再用 `xfs_growfs /data` 擴充檔案系統。
+2. 把 `saa-data-snap` 複製到 `us-west-2`，觀察複製時可以改用另一把 KMS 金鑰。
+3. 在 EFS 建立「存取點」（Access Point），強制以 UID 1000 寫入 `/app` 目錄，再用 `mount -t efs -o tls,accesspoint=fsap-...` 掛載。
+4. 開一台有 **Instance Store** 的類型（例如 m5d.large），停止再啟動後觀察 instance store 的資料消失（重開機不會）。
+
+### 考試重點
+
+| 需求 | 答案 |
+|---|---|
+| EBS 搬到另一個 AZ / 區域 | **快照** → 在目標 AZ 建磁碟區；跨區域先**複製快照** |
+| 多台 Linux EC2、跨 AZ 共用檔案 | **EFS**（NFS、區域性）；Windows 用 **FSx for Windows** |
+| 高效能隨機 IO、資料庫 | io2 / io2 Block Express；一般用途選 **gp3**（IOPS 與輸送量可獨立調整） |
+| 大量循序讀寫、便宜 | st1（輸送量最佳化 HDD）；冷資料 sc1；HDD 不能當開機磁碟 |
+| 最高 IOPS、可接受資料遺失（暫存） | **Instance Store**（停止 / 終止即消失） |
+| 同 AZ 多台同時掛同一顆 EBS | io1/io2 **Multi-Attach**（需叢集檔案系統） |
+| 從快照還原後立刻滿效能 | **Fast Snapshot Restore**（或預先讀取所有區塊） |
+| 快照誤刪保護 | **快照資源回收筒**（Recycle Bin）保留規則 |
+| 未加密磁碟區改成加密 | 建快照 → **複製快照時加密** → 由加密快照建磁碟區 |
+| EFS 降低成本 | 生命週期轉 **IA / Archive**、One Zone 儲存類別 |
+| 終止 EC2 後保留資料磁碟區 | 資料磁碟區「在終止時刪除」預設關閉；根磁碟區預設開啟 |
+
+---
+## Lab 14：VPC Peering、Flow Logs 與 Network ACL（VPC 進階）
+
+> **本 Lab 操作身分與環境**
+>
+> | 項目 | 內容 |
+> |---|---|
+> | 操作身分 | IAM 使用者 **`saa-admin`** |
+> | 區域 | **us-east-1** |
+> | 前置條件 | Lab 13 的 `saa-storage-a`（預設 VPC 172.31.0.0/16、us-east-1a，私有 IP 172.31.6.113） |
+> | 預估時間 / 費用 | 約 30 分鐘 / 1 台 t3.micro + 公有 IPv4 + Flow Logs 寫入 CloudWatch Logs，約 0.05 美元；**不建 NAT 閘道** |
+
+**目標**：建立第二個 VPC `saa-peer-vpc`（10.20.0.0/16），用 **VPC Peering** 與預設 VPC 互通；開 **Flow Logs** 觀察流量；再用 **NACL**（無狀態、子網路層級、可以 Deny）擋掉 ICMP，對照 Security Group（有狀態、執行個體層級、只能 Allow）的差異。
+
+```mermaid
+flowchart LR
+  subgraph DEF[預設 VPC 172.31.0.0/16]
+    A[saa-storage-a<br/>172.31.6.113]
+    RT1[主路由表<br/>10.20.0.0/16 → pcx]
+  end
+  subgraph PEER[saa-peer-vpc 10.20.0.0/16]
+    NACL{{saa-peer-nacl<br/>90 DENY ICMP 172.31/16<br/>100 ALLOW ALL}}
+    B[saa-peer-b<br/>10.20.6.241<br/>saa-peer-sg 允許 ICMP]
+    RT2[saa-peer-rtb-public<br/>172.31.0.0/16 → pcx]
+  end
+  A <-->|pcx-00880416443e4a1a0| B
+  NACL --- B
+  B -. Flow Logs .-> CWL[(CloudWatch Logs<br/>/saa/vpc-flow-logs)]
+```
+
+> `saa-peer-b` 與 `saa-peer-sg` 用 CloudShell 建立（指令見 CLI 等效）：SG 只開 **ICMP，來源 172.31.0.0/16**，執行個體放在 peer VPC 的公有子網路並指派公有 IP（給 SSM Agent 對外連線用）。
+
+### Step 14-1　建立 VPC：saa-peer-vpc（1 AZ、1 公有子網路、無 NAT）
+
+**進入路徑**：VPC →「建立 VPC」→「VPC 和更多」
+
+![建立 peer VPC](images/lab14-01-create-peer-vpc.jpg)
+
+1. 要建立的資源「VPC 和更多」。
+2. 名稱標籤自動產生 `saa-peer`。**坑又出現了**：欄位預設值「專案」，Ctrl+A 沒有全選，結果變成「saa-peer專案」；CIDR 也變成「10.20.0.0/1610.0.0.0/16」——要用 End + Backspace 清乾淨再輸入（踩坑 #4）。
+3. IPv4 CIDR **10.20.0.0/16**：**不能與要 Peering 的 VPC（172.31.0.0/16）重疊**，否則無法建立 Peering。
+4. AZ 數量 **1**。
+5. 公有子網路 **1**。
+6. 私有子網路 **0**。
+7. NAT 閘道「無」（選項：無／區域性 – 全新／Zonal，見 Lab 2.B）。
+8. VPC 端點「無」。
+9. 按「建立 VPC」→ `vpc-02d6349747a45724f`、子網路 `subnet-082d7ad392b6a84fd`（10.20.0.0/20）、IGW `igw-0f3ac3b0da2b1081d`、公有路由表 `rtb-0d15b5f1bc51133de`。
+
+### Step 14-2　建立對等連線 saa-default-to-peer
+
+**進入路徑**：VPC →「對等連線」→「建立對等連線」
+
+![建立對等連線](images/lab14-02-create-peering.jpg)
+
+1. 名稱 `saa-default-to-peer`。
+2. 本機 VPC（**申請者**）：預設 VPC `vpc-06c8ce0a3b085ebae`，CIDR 172.31.0.0/16。
+3. 其他 VPC：帳戶「我的帳戶」、區域「此區域」（也支援**跨帳號、跨區域**）。
+4. **接受者** VPC：`saa-peer-vpc`，CIDR 10.20.0.0/16。
+5. 按「建立對等連線」。
+
+> 建立後立刻跳到詳細頁時出現「找不到對等連線 … does not exist」：API 最終一致性，按「重試」即可。
+
+### Step 14-3　等待接受（Pending Acceptance）
+
+![等待接受](images/lab14-03-peering-pending.jpg)
+
+1. 「等待接受」：即使兩個 VPC 都在同一帳號，也要**接受者**明確接受；請求 **7 天**內未處理就過期（畫面顯示到 2026-11-11）。
+2. 狀態 `Pending Acceptance by 123456789012`。
+3. 過期時間。
+4. 申請者 VPC / CIDR。
+5. 接受者 VPC `saa-peer-vpc`、接受者 CIDR 此時還是「–」。
+6. 「動作」→「接受請求」。
+
+### Step 14-4　接受對等連線請求
+
+![接受請求](images/lab14-04-accept-peering.jpg)
+
+1. 申請者 VPC。
+2. 接受者 VPC `saa-peer-vpc`，兩邊擁有者都是本帳戶。
+3. 按「接受請求」。
+
+### Step 14-5　對等連線 Active
+
+![Active](images/lab14-05-peering-active.jpg)
+
+1. 狀態 **Active**。
+2. 綠色提示：「若要傳送與接收此 VPC 對等連線上的流量，您必須在一個或多個 VPC 路由表中新增路由到對等的 VPC」——**Peering 不會自動加路由**。
+3. 「立即修改我的路由表」捷徑。
+4. 接受者 CIDR 現在顯示 10.20.0.0/16。
+
+### Step 14-6　預設 VPC 主路由表：10.20.0.0/16 → pcx
+
+**進入路徑**：VPC →「路由表」→ 預設 VPC 的主路由表 `rtb-0cc42cb299579c556` →「編輯路由」→「新增路由」
+
+![預設 VPC 路由](images/lab14-06-route-default-to-peer.jpg)
+
+1. 原有路由：172.31.0.0/16 → local、0.0.0.0/0 → `igw-06980903a34cd201b`。
+2. 新增目的地 **10.20.0.0/16**……
+3. ……目標類型「對等連線」→ `pcx-00880416443e4a1a0`。
+4. 按「儲存變更」。
+
+### Step 14-7　peer VPC 公有路由表：172.31.0.0/16 → pcx
+
+**進入路徑**：`saa-peer-rtb-public`（`rtb-0d15b5f1bc51133de`）→「編輯路由」
+
+![peer VPC 路由](images/lab14-07-route-peer-to-default.jpg)
+
+1. 新增目的地 **172.31.0.0/16**……
+2. ……目標「對等連線」→ `pcx-00880416443e4a1a0`。
+3. 按「儲存變更」。
+
+> **兩邊都要加**：只加一邊，封包去得了、回不來。
+
+### Step 14-8　建立 Flow Log：saa-peer-vpc → CloudWatch Logs
+
+**進入路徑**：VPC →「您的 VPC」→ `saa-peer-vpc` →「動作」→「建立流程日誌」
+
+![建立流程日誌](images/lab14-08-create-flow-log.jpg)
+
+1. 選取的資源 `saa-peer-vpc`（Flow Log 可以建在 **VPC、子網路或 ENI** 層級）。
+2. 名稱 `saa-peer-flowlog`；篩選「全部」（也可以只收 ACCEPT 或 REJECT）。
+3. 彙總間隔上限改成 **1 分鐘**（預設 10 分鐘，練習時等比較快）。
+4. 目的地：**CloudWatch 日誌**（也可以送 S3 或 Data Firehose；大量長期保存用 S3 + Athena 查詢最便宜）。
+5. 目的地日誌群組輸入 `/saa/vpc-flow-logs` → 選「使用：/saa/vpc-flow-logs」（不存在時會自動建立）。
+6. 服務存取權：新版可以直接「**建立和使用新的服務角色**」，名稱改成 `saa-flowlogs-role`（主控台會建在 `/service-role/` 路徑下）。
+7. 日誌記錄格式「AWS 預設格式」：`version account-id interface-id srcaddr dstaddr srcport dstport protocol packets bytes start end action log-status`。
+8. 按「建立流程日誌」→ `fl-0e6eb668c4c20b07d`。
+
+### Step 14-9　從 saa-storage-a ping saa-peer-b：成功
+
+**進入路徑**：Session Manager → `saa-storage-a`
+
+![ping 成功](images/lab14-09-ping-ok.jpg)
+
+1. `saa-storage-a` 的私有 IP 172.31.6.113。
+2. `ping -c 4 10.20.6.241`：4 個回應、**ttl=127**、延遲約 0.3–3 ms（同區域內網，不經網際網路）。
+3. `4 packets transmitted, 4 received, 0% packet loss`。
+
+### Step 14-10　建立 NACL saa-peer-nacl：新 NACL 預設全部拒絕
+
+**進入路徑**：VPC →「網路 ACL」→「建立網路 ACL」→ 名稱 `saa-peer-nacl`、VPC 選 `saa-peer-vpc` → 建立後點進 `acl-05f6d768e3f6adefe`
+
+![新 NACL](images/lab14-10-nacl-new-default-deny.jpg)
+
+1. 預設「否」：這不是 VPC 的預設 NACL。
+2. 關聯對象「–」：還沒套用到任何子網路。
+3. 屬於 `saa-peer-vpc`。
+4. 傳入規則只有一條 `*`（規則編號 32767）＝**拒絕所有流量**。對照：**VPC 的預設 NACL 是全部允許**，**自訂 NACL 是全部拒絕**。
+5. 「編輯傳入規則」。
+
+### Step 14-11　傳入規則：90 拒絕 ICMP、100 允許全部
+
+![NACL 傳入規則](images/lab14-11-nacl-inbound-rules.jpg)
+
+1. 規則 **90**：類型「所有 ICMP - IPv4」、來源 **172.31.0.0/16**、**拒絕**。
+2. 規則 **100**：所有流量、0.0.0.0/0、允許。
+3. 規則 `*`：拒絕（不能刪）。
+4. 按「儲存變更」。
+
+> **NACL 依規則編號由小到大比對，第一條符合就生效**。ICMP 先碰到 90 被拒絕，不會走到 100。
+> **NACL 是無狀態的**：傳出也要另外允許（本 Lab 用 CLI 加了傳出規則 100 允許全部；實務上回應流量走的是 **1024–65535 臨時連接埠**，傳出規則至少要開這段）。
+
+```bash
+aws ec2 create-network-acl-entry --network-acl-id acl-05f6d768e3f6adefe --egress \
+  --rule-number 100 --protocol -1 --cidr-block 0.0.0.0/0 --rule-action allow
+```
+
+### Step 14-12　子網路關聯：把 NACL 套到 peer 子網路
+
+**進入路徑**：`saa-peer-nacl` →「動作」→「編輯子網路關聯」
+
+![子網路關聯](images/lab14-12-nacl-associate.jpg)
+
+1. 勾選 `saa-peer-subnet-public1-us-east-1a`……
+2. ……它目前關聯的是 VPC 的預設 NACL `acl-0990a8b2d05c4edfe`（**一個子網路同時只能關聯一個 NACL**，選了新的就會取代舊的）。
+3. 選取的子網路 `subnet-082d7ad392b6a84fd`。
+4. 按「儲存變更」。
+
+### Step 14-13　再 ping 一次：被 NACL 擋下
+
+![ping 失敗](images/lab14-13-ping-blocked.jpg)
+
+1. 時間 16:44:27（UTC）。
+2. `4 packets transmitted, 0 received, 100% packet loss`：`saa-peer-sg` 明明允許 ICMP，封包仍在**子網路邊界**就被 NACL 拒絕。
+
+### Step 14-14　Flow Logs：ACCEPT 與 REJECT
+
+**進入路徑**：CloudWatch →「日誌管理」→ `/saa/vpc-flow-logs` →「搜尋所有日誌串流」→ 篩選 `172.31.6.113`（收合左側導覽列讓訊息欄位變寬，點左邊三角形展開）
+
+![Flow Logs](images/lab14-14-flow-logs-accept-reject.jpg)
+
+1. 篩選條件 `172.31.6.113`（來源 IP）。
+2. 16:41:29：`… eni-0daf31fa55605eb98 172.31.6.113 10.20.6.241 0 0 1 4 336 … ACCEPT OK` → 協定 1（ICMP）、4 個封包、336 bytes，**ACCEPT**。
+3. 16:44:30：`… 172.31.6.113 10.20.6.241 0 0 1 1 84 … REJECT OK` → 被拒絕（NACL 或 SG 拒絕都會記為 REJECT；要分辨是哪一層，就看 SG 是否允許）。
+4. 日誌串流名稱就是 **ENI ID**：每個網路介面一個串流。
+
+> Flow Logs 只記錄「中繼資料」（誰、到哪、多少、允許或拒絕），**不包含封包內容**；要看內容用 **VPC Traffic Mirroring**。
+
+### CLI 等效
+
+```bash
+./scripts/14-vpc-advanced.sh
+```
+
+### 實務情境
+
+- **銀行**：多個業務 VPC（網銀、核心、資料平台）之間不用 Peering 網狀連線，而是 **Transit Gateway** 集中路由並搭配路由表隔離；Flow Logs 統一送到 Log Archive 帳號的 S3，SIEM（例如 Elastic、Security Lake）分析 REJECT 趨勢。
+- **製造**：工廠 OT 網段透過 Site-to-Site VPN / Direct Connect 進入雲端，NACL 在子網路層級封鎖已知的惡意 CIDR；SG 再做服務層級的白名單。
+- **零售**：外部合作夥伴（金流、物流）用 **PrivateLink**（端點服務）只暴露單一服務，而不是 Peering 整個 VPC；CIDR 重疊也不影響。
+
+### 延伸練習
+
+1. 再建一個 `10.30.0.0/16` 的 VPC 與 `saa-peer-vpc` Peering，驗證預設 VPC 無法經由 `saa-peer-vpc` 連到 10.30（**Peering 不可遞移**）。
+2. 把 Flow Log 目的地改成 S3，用 Athena 的「建立資料表」範本查詢 REJECT 次數最多的來源 IP。
+3. 在 NACL 傳出規則只允許 TCP 1024–65535，觀察 Session Manager 是否仍能運作（理解臨時連接埠）。
+4. 在 `saa-peer-sg` 的來源改成「另一個 VPC 的 SG ID」（同區域 Peering 支援參照對方 SG）。
+
+### 考試重點
+
+| 需求 | 答案 |
+|---|---|
+| 兩個 VPC 私有互通（少量） | **VPC Peering**（CIDR 不可重疊、不可遞移、兩邊都要加路由） |
+| 大量 VPC / 地端集中互連 | **Transit Gateway**（hub-and-spoke，可跨區域 Peering） |
+| 只暴露單一服務給其他 VPC / 帳號 | **PrivateLink**（Interface Endpoint + NLB） |
+| 封鎖特定 IP / CIDR | **NACL Deny**（SG 不能 Deny） |
+| 有狀態 vs 無狀態 | SG 有狀態（回應自動允許）；NACL 無狀態（進出都要規則，含臨時連接埠） |
+| 規則評估順序 | NACL 依編號由小到大，第一條符合即生效；SG 所有規則取聯集 |
+| 誰被拒絕、流量多少 | **VPC Flow Logs**（VPC / 子網路 / ENI 層級，送 CloudWatch Logs、S3、Firehose） |
+| 需要封包內容（IDS） | **Traffic Mirroring** |
+| 自訂 NACL 的預設 | 全部拒絕；VPC 預設 NACL 全部允許 |
+
+---
+## Lab 15：API Gateway、EventBridge 與 Step Functions（Serverless 進階）
+
+> **本 Lab 操作身分與環境**
+>
+> | 項目 | 內容 |
+> |---|---|
+> | 操作身分 | IAM 使用者 **`saa-admin`** |
+> | 區域 | **us-east-1** |
+> | 前置條件 | 無（不依賴 Lab 8，Lambda 另建一支 `saa-hello`） |
+> | 預估時間 / 費用 | 約 30 分鐘 / 呼叫次數極少，在免費方案或 0.01 美元以內 |
+
+**目標**：兩條常見的 Serverless 路徑——
+① **同步**：用戶端 → **API Gateway（REST API）** → **Lambda Proxy 整合** → 回傳 JSON；
+② **非同步、事件驅動**：生產者送出事件到 **EventBridge** → 規則依**事件模式**比對 → 觸發 **Step Functions** 狀態機（Choice 分支 + Wait）。
+
+```mermaid
+flowchart LR
+  C[curl / 瀏覽器] -->|GET /dev/hello| APIGW[API Gateway<br/>saa-hello-api<br/>Regional]
+  APIGW -->|Lambda Proxy| L[Lambda saa-hello<br/>Python 3.14]
+  P[生產者<br/>主控台 / put-events] -->|source=saa.orders<br/>detail-type=OrderCreated| EB[(EventBridge<br/>default bus)]
+  EB -->|規則 saa-order-created-rule| SF{{Step Functions<br/>saa-order-flow}}
+  SF -->|amount > 100| W[ManualReview<br/>Wait 5s] --> M[MarkManual] --> OK((Approved))
+  SF -->|其他| AA[AutoApprove] --> OK
+```
+
+### Step 15-1　建立 Lambda saa-hello
+
+**進入路徑**：Lambda →「建立函式」（新版標題 **Create Event Function**）
+
+![建立 Lambda](images/lab15-01-lambda-create.jpg)
+
+1. 「從頭開始撰寫」。
+2. 函式名稱 `saa-hello`。
+3. 執行時期 **Python 3.14**（清單中列為「最新支援」；另有 3.15 Preview）。
+4. 許可：預設建立只具備寫入 CloudWatch Logs 權限的執行角色。
+5. 新的「自訂設定」：「**耐久性執行**」（durable functions，可從失敗中復原的有狀態流程）與「**EC2 容量提供者**」（在你指定的 EC2 執行個體類型上執行 Lambda）；兩者都是**建立後不能新增或移除**的設定（畫面下方的提示），本 Lab 都不開。
+6. 「其他設定」收著架構、執行角色、HTTP(S) 端點（函式 URL）、VPC、程式碼簽署、KMS 金鑰。
+7. 按「Create Event Function」→ 跳出「Getting started」對話框 →「Dismiss」。
+
+函式程式碼（`lambda/hello/lambda_function.py`）用 CloudShell 上傳，避免主控台編輯器自動補括號的問題（踩坑 #17）：
+
+```python
+import json, os
+
+def lambda_handler(event, context):
+    qs = event.get("queryStringParameters") or {}
+    name = qs.get("name", "SAA")
+    body = {"message": f"Hello, {name}!", "path": event.get("path"), "method": event.get("httpMethod"), "requestId": context.aws_request_id}
+    return {"statusCode": 200, "headers": {"Content-Type": "application/json"}, "body": json.dumps(body)}
+```
+
+```bash
+cd lambda/hello && zip -q fn.zip lambda_function.py
+aws lambda update-function-code --function-name saa-hello --zip-file fileb://fn.zip
+```
+
+> **Lambda Proxy 整合的回應格式**：一定要回 `statusCode`、`headers`、**字串型態**的 `body`；回傳格式不對，API Gateway 會給 `502 Malformed Lambda proxy response`。
+
+### Step 15-2　選擇 API 類型
+
+**進入路徑**：API Gateway →「建立 API」
+
+![API 類型](images/lab15-02-api-types.jpg)
+
+1. **HTTP API**：低延遲、便宜、內建 JWT（OIDC / OAuth2）授權與 CORS。
+2. **WebSocket API**：雙向持續連線（聊天、即時儀表板）。
+3. **REST API**：功能最完整——API 金鑰與**用量計畫**、請求驗證、**快取**、WAF、資源政策、Canary 部署。
+4. **REST API 私有**：只能從 VPC 內透過 Interface Endpoint 存取。
+5. 本 Lab 選 **REST API** →「建置」。
+
+### Step 15-3　REST API：名稱與端點類型
+
+![端點類型](images/lab15-03-rest-api-endpoint-types.jpg)
+
+1. 「新 API」。
+2. API 名稱 `saa-hello-api`、描述 `SAA Lab 15 REST API -> Lambda proxy`。
+3. 端點類型「**區域性**」：部署在目前區域，適合同區域用戶端或自己前面再放 CloudFront。
+4. 「**邊緣最佳化**」：請求經由 AWS 管理的 CloudFront 邊緣節點進入（全球分散用戶端）。
+5. 「**私有**」：只能從 VPC 存取。
+
+### Step 15-4　新欄位：安全政策、端點存取模式、IP 類型
+
+![安全政策](images/lab15-04-rest-api-security.jpg)
+
+1. 端點類型「區域性」。
+2. 「**安全政策 - 新**」：必須選擇，選 `SecurityPolicy_TLS13_1_3_2025_09 (recommended)`（至少 TLS 1.3）；清單中也有 TLS 1.2、FIPS、PFS 等政策，舊名稱 `TLS_1_0` / `TLS_1_2` 標示為舊政策。
+3. 「**端點存取模式 - 新**」：「基本」允許所有用戶端存取；「嚴格（建議）」強制 SNI 驗證。本 Lab 用「基本」。
+4. IP 地址類型 IPv4（Dualstack 支援 IPv6）。
+5. 按「建立 API」→ API ID `db8opqi0ql`。
+
+### Step 15-5　建立資源 /hello 與 GET 方法
+
+**進入路徑**：「資源」→「建立資源」→ 資源名稱 `hello` →「建立資源」→ 選 `/hello` →「建立方法」
+
+![建立方法](images/lab15-05-create-method.jpg)
+
+1. 方法類型 **GET**。
+2. 整合類型「**Lambda 函數**」（其他：HTTP、模擬 Mock、AWS 服務、VPC 連結）。
+3. 開啟「**Lambda 代理整合**」：整個 HTTP 請求（路徑、標頭、查詢字串、內文）原封不動包成 event 交給 Lambda，回應也由 Lambda 決定。
+4. Lambda 函數：`arn:aws:lambda:us-east-1:123456789012:function:saa-hello`。
+5. 「授予 API Gateway 調用 Lambda 函數的許可」：儲存時主控台會自動在 Lambda 的**資源型政策**加入 `lambda:InvokeFunction`（CLI 要自己 `add-permission`）。
+6. 整合逾時預設 **29,000 毫秒**（REST API 上限 29 秒；可向 Service Quotas 申請提高）。→「建立方法」。
+
+### Step 15-6　方法建立完成：記得「部署」
+
+![方法建立](images/lab15-06-method-created.jpg)
+
+1. 提示：「已成功建立 'hello' 中的方法 'GET'。**重新部署 API 以使更新生效**」——REST API 的變更要**部署到階段**才會生效。
+2. 資源樹 `/` → `/hello` → `GET`。
+3. 方法 ARN `arn:aws:execute-api:us-east-1:123456789012:db8opqi0ql/*/GET/hello`（IAM 授權、資源政策用這個格式）。
+4. 按「部署 API」。
+
+### Step 15-7　部署到新階段 dev
+
+![部署](images/lab15-07-deploy-stage.jpg)
+
+1. 階段「*新階段*」。
+2. 階段名稱 `dev`。
+3. 部署說明 `first deployment`。
+4. 按「部署」。
+
+### Step 15-8　階段 dev：節流與 WAF
+
+![階段](images/lab15-08-stage-dev.jpg)
+
+1. 「已成功建立 saa-hello-api 的部署。此部署在 dev 中處於作用中狀態」。
+2. 費率（Rate）**10000** 個請求/秒（預設帳戶層級節流）。
+3. Web ACL「-」：REST API 階段可以掛 **AWS WAF**。
+4. 快取叢集「非作用中」：REST API 可在階段開啟快取（以 GB 計費）。
+5. 爆量（Burst）**5000**。超過節流上限回 **429 Too Many Requests**。
+
+### Step 15-9　叫用 URL 與日誌
+
+![叫用 URL](images/lab15-09-invoke-url.jpg)
+
+1. 叫用 URL `https://db8opqi0ql.execute-api.us-east-1.amazonaws.com/dev`（格式：`https://{api-id}.execute-api.{region}.amazonaws.com/{stage}`）。
+2. 作用中部署 `u7178z`：每次部署都有 ID，可以回滾到舊部署。
+3. 日誌和追蹤：執行日誌、詳細指標、X-Ray 預設都未開啟（開啟執行日誌需先在「API 設定」指定 CloudWatch 角色）。
+
+### Step 15-10　用 curl 測試
+
+```bash
+U=https://db8opqi0ql.execute-api.us-east-1.amazonaws.com/dev
+curl -s "$U/hello?name=Rex" | jq .
+curl -s -o /dev/null -w 'GET /nothing -> HTTP %{http_code}\n' $U/nothing; curl -s $U/nothing; echo
+curl -s -X POST -o /dev/null -w 'POST /hello -> HTTP %{http_code}\n' $U/hello
+```
+
+![curl 測試](images/lab15-10-curl-api.jpg)
+
+1. `GET /hello?name=Rex` → `{"message":"Hello, Rex!","path":"/hello","method":"GET","requestId":"542493bf-…"}`：查詢字串經 Proxy 整合傳進 Lambda。
+2. `GET /nothing` → **HTTP 403** `{"message":"Forbidden"}`：不存在的路徑（舊教材常寫回 `Missing Authentication Token`，本次實測訊息是 `Forbidden`）。
+3. `POST /hello` → **403**：沒有定義的方法同樣被拒絕。
+
+> 實作時曾把 API ID 的 `i` 誤打成 `l`（`db8opql0ql`），curl 得到 `HTTP 000`（DNS 解析失敗）。看到 000 先檢查網址。
+
+### Step 15-11　建立狀態機 saa-order-flow
+
+**進入路徑**：Step Functions →「狀態機」→「建立狀態機」
+
+![建立狀態機](images/lab15-11-sfn-create.jpg)
+
+1. 「從空白建立」（另一個「從範本建立」有現成案例）。
+2. 狀態機名稱 `saa-order-flow`（建立後不能改名）。
+3. 類型「**標準**」：可執行最長 **1 年**、恰好一次（exactly-once）、執行歷史保存在 Step Functions，適合訂單審核這類長流程。
+4. 「**快速**」（Express）：最長 **5 分鐘**、至少一次、高吞吐、便宜，歷史要串流到 CloudWatch Logs，適合 IoT / 串流資料處理。
+5. 按「繼續」進入 Workflow Studio。
+
+### Step 15-12　Workflow Studio：貼上 ASL 定義
+
+**進入路徑**：Workflow Studio 上方切到「程式碼」→ 貼上 `stepfunctions/order-flow.asl.json`
+
+![ASL 定義](images/lab15-12-sfn-code.jpg)
+
+1. 「程式碼」檢視（也可以在「設計」頁從左邊拖拉狀態；新版預設查詢語言是 **JSONata**，本 Lab 的 ASL 用傳統 JSONPath 寫法，沒有指定 `QueryLanguage` 時即為 JSONPath）。
+2. `CheckAmount` 是 **Choice** 狀態：`$.detail.amount > 100` 走 `ManualReview`，否則 `Default` 走 `AutoApprove`。
+3. `ManualReview` 是 **Wait** 狀態（等 5 秒，模擬人工審核；實務上會用 `.waitForTaskToken` 等待外部回呼）。
+4. 右邊圖形即時更新：Choice state `CheckAmount`……
+5. ……分支條件標籤 `$.detail.amount > 100`……
+6. ……接著 Wait state `ManualReview` → Pass state `MarkManual` → Succeed。
+7. 右上「建立」（視窗太窄時按鈕會被擠到畫面外，可以縮小瀏覽器或捲動）。
+
+### Step 15-13　確認建立執行角色
+
+![確認角色](images/lab15-13-sfn-role.jpg)
+
+1. 主控台會建立 `StepFunctions-saa-order-flow-role-<亂碼>` 執行角色，並**依定義中用到的服務自動產生權限**。
+2. 這個定義只有 Pass / Choice / Wait / Succeed，不呼叫任何 AWS 服務，所以只產生 **X-Ray** 權限。
+3. 按「確認」→「狀態機已成功建立」。
+
+### Step 15-14　EventBridge 規則建置器：增強 vs 進階
+
+**進入路徑**：Amazon EventBridge →「規則」→「建立規則」
+
+![建置器模式](images/lab15-14-eventbridge-builder.jpg)
+
+1. 新版預設「**增強的建置器**」：視覺化拖拉，左邊拖事件、右邊拖目標。
+2. 「**進階建置器**」：逐步規則組態（舊版精靈），本 Lab 用這個。
+3. 事件匯流排 `default`（AWS 服務事件都送到預設匯流排；自己的應用也可以送到這裡，或另建**自訂事件匯流排**）。
+4. 左側「AWS 服務活動」「自訂事件」兩種來源。
+
+步驟 1：名稱 `saa-order-created-rule`、描述 `OrderCreated from saa.orders -> saa-order-flow`、事件匯流排 default、規則類型預設「具有事件模式的規則」→「下一步」。
+
+### Step 15-15　步驟 2：事件模式
+
+![事件模式](images/lab15-15-event-pattern.jpg)
+
+事件來源選「**其他**」（自訂事件或來自合作夥伴的事件）。
+
+1. 建立方法「自訂模式（JSON 編輯器）」。
+2. 也可以從「插入」選預設模式、或開啟「基於內容的篩選條件語法」（`prefix`、`numeric`、`anything-but` 等）。
+3. 事件模式：
+
+```json
+{
+  "source": ["saa.orders"],
+  "detail-type": ["OrderCreated"]
+}
+```
+
+模式中的每個欄位都要符合（AND）、陣列中的值任一符合即可（OR）。下方顯示「JSON 有效」→「下一步」。
+
+### Step 15-16　步驟 3：目標 = Step Functions 狀態機
+
+![目標](images/lab15-16-eventbridge-target.jpg)
+
+1. 目標類型「AWS 服務」（也可以送到另一個事件匯流排、或 **API 目的地**呼叫外部 SaaS 的 HTTP API）。
+2. 選取目標「Step Functions 狀態機」（每條規則最多 5 個目標）。
+3. 狀態機 `saa-order-flow`。
+4. 執行角色「建立預設角色」→ `Amazon_EventBridge_Invoke_Step_Functions_<數字>`，授權 `states:StartExecution`。
+5. 按「跳至 檢閱和建立」→「建立規則」。
+
+### Step 15-17　傳送測試事件
+
+**進入路徑**：EventBridge →「事件匯流排」→ `default` →「傳送事件」
+
+![傳送事件](images/lab15-17-send-event.jpg)
+
+1. 事件匯流排 `default`。
+2. 事件來源 `saa.orders`。
+3. 詳細資訊類型 `OrderCreated`。
+4. 事件詳細資訊 `{"order_id":"A2001","amount":250,"customer":"carol"}` → 捲到下方按「傳送」。
+
+### Step 15-18　事件已送出
+
+![事件已送出](images/lab15-18-event-sent.jpg)
+
+1. 「已成功傳送事件」。
+2. 狀態「成功」。
+3. EventBridge 包裝後的事件：`version`、`id`（`417d9f09-…`）、`detail-type`、`source`、`account`、`time`、`region`、`resources`……
+4. ……原本的內容放在 **`detail`** 底下——所以狀態機要用 `$.detail.amount` 取值。
+
+再用 CloudShell 送兩個事件：一筆小額訂單（走另一個分支），一筆 `OrderShipped`（應該被規則**過濾掉**）：
+
+```bash
+aws events put-events --entries '[
+ {"Source":"saa.orders","DetailType":"OrderCreated","Detail":"{\"order_id\":\"A2002\",\"amount\":45,\"customer\":\"dave\"}"},
+ {"Source":"saa.orders","DetailType":"OrderShipped","Detail":"{\"order_id\":\"A2001\"}"}]'
+```
+
+### Step 15-19　狀態機的執行紀錄：只有 2 次
+
+**進入路徑**：Step Functions → `saa-order-flow` →「執行」分頁
+
+![執行清單](images/lab15-19-sfn-executions.jpg)
+
+1. IAM 角色 `StepFunctions-saa-order-flow-role-jsvp1h7pk`、類型標準。
+2. 執行 **2 筆、都「已成功」**：A2001（250）與 A2002（45）；`OrderShipped` 不符合事件模式，沒有觸發。執行名稱是「事件 ID_亂碼」，方便從事件追到執行。
+
+### Step 15-20　A2001 走的路徑：CheckAmount → ManualReview → MarkManual → Approved
+
+**進入路徑**：點 `417d9f09-…` 那筆執行 → 下方「表格檢視」
+
+![執行路徑](images/lab15-20-sfn-execution-path.jpg)
+
+1. `CheckAmount`（Choice）已成功。
+2. `ManualReview`（Wait）持續 **00:00:05.037**：amount 250 > 100，進入人工審核分支。
+3. `MarkManual`（Pass）→ `Approved`（Succeed）。A2002（45）則走 `AutoApprove`。
+
+### Step 15-21　執行詳細資訊
+
+![執行詳細](images/lab15-21-sfn-execution-detail.jpg)
+
+1. 執行狀態「已成功」、類型 Standard。
+2. 持續時間 **5.080 秒**（幾乎都是 Wait）。
+3. 狀態轉換 **6** 次：標準工作流程**依狀態轉換次數計費**；快速工作流程依執行次數與時間計費。
+
+### CLI 等效
+
+```bash
+./scripts/15-serverless-integration.sh
+```
+
+### 實務情境
+
+- **銀行**：開戶流程用 Step Functions 串接身分驗證、AML 檢查、人工覆核（`waitForTaskToken`）與通知；每一步的輸入輸出都留在執行歷史，稽核時可以直接調閱。對外 API 用 REST API + WAF + 用量計畫分級節流。
+- **製造**：設備告警事件送進 EventBridge，依 `detail.severity` 路由：嚴重的觸發工單流程（Step Functions）、一般的寫入資料湖；新增訂閱者只要加規則，不必改生產者。
+- **零售**：訂單 API（API Gateway + Lambda）只負責接單並送出 `OrderCreated` 事件，扣庫存、點數、出貨各自訂閱；**EventBridge Archive & Replay** 可以在系統修復後重播漏處理的事件。
+
+### 延伸練習
+
+1. 為 `saa-hello-api` 建立 API 金鑰與用量計畫（每秒 1 個請求、每天 100 個），在 GET 方法設定「需要 API 金鑰」，觀察沒有 `x-api-key` 時回 403、超量回 429。
+2. 改用 **HTTP API** 做同一件事，比較主控台步驟與功能差異（沒有用量計畫、沒有快取，但更便宜）。
+3. 把 `ManualReview` 改成呼叫 Lambda 的 `.waitForTaskToken` 任務，再用 `aws stepfunctions send-task-success` 手動核准。
+4. 在 EventBridge 規則改用內容篩選 `"detail": {"amount": [{"numeric": [">", 100]}]}`，讓小額訂單根本不觸發狀態機。
+
+### 考試重點
+
+| 需求 | 答案 |
+|---|---|
+| Serverless REST API、需要用量計畫 / API 金鑰 / 快取 / WAF | **API Gateway REST API** |
+| 最便宜、最低延遲的 Lambda 前端 | **HTTP API**（或 Lambda 函式 URL） |
+| 雙向即時通訊 | **WebSocket API** |
+| 只給 VPC 內部用的 API | **Private REST API** + Interface Endpoint |
+| 突發流量保護後端 | API Gateway **節流**（429）+ 用量計畫；後端用 SQS 緩衝 |
+| 多步驟流程、重試、分支、人工核准 | **Step Functions 標準**（最長 1 年、exactly-once） |
+| 高頻、短時間（< 5 分鐘）的流程 | **Step Functions 快速** |
+| 依事件內容路由到多個目標 / SaaS 事件 | **EventBridge**（規則 + 事件模式；合作夥伴事件匯流排） |
+| 排程觸發（cron） | **EventBridge Scheduler** |
+| 事件重播 | EventBridge **Archive & Replay** |
+| 一對多推播、簡單扇出 | SNS（見 Lab 11）；需要依內容過濾且目標多元 → EventBridge |
+
+---
+## Lab 16：CloudTrail、Config、Athena 與 ECS Fargate（治理、資料與容器）
+
+> **本 Lab 操作身分與環境**
+>
+> | 項目 | 內容 |
+> |---|---|
+> | 操作身分 | IAM 使用者 **`saa-admin`** |
+> | 區域 | **us-east-1**，ECS 使用預設 VPC |
+> | 前置條件 | 無（CloudTrail 事件歷史記錄預設啟用；用 Lab 14 的 `CreateVpcPeeringConnection` 當查詢範例） |
+> | 預估時間 / 費用 | 約 40 分鐘 / Config 依記錄的組態項目與規則評估次數計費（只記錄 SG，幾分錢）、Athena 依掃描量（本 Lab 0.27 KB）、Fargate 0.25 vCPU / 0.5 GB 跑十幾分鐘不到 0.01 美元 |
+
+**目標**：四個「考試很常出現、但很少有人真的點過」的服務各做一次最小可行操作——
+
+| 服務 | 回答的問題 | 本 Lab 做的事 |
+|---|---|---|
+| **CloudTrail** | **誰**在**什麼時候**呼叫了**哪個 API**？ | 查到 Lab 14 是 `saa-admin` 建立了 Peering |
+| **AWS Config** | 資源**現在長什麼樣**、**是否合規**、怎麼變過來的？ | 只記錄 SG，用受管規則 `restricted-ssh` 抓出開放 22 給全世界的 SG |
+| **Athena** | 不建資料庫，直接用 **SQL 查 S3** | 查 `orders.csv` 金額大於 100 的訂單 |
+| **ECS Fargate** | 不管伺服器就能跑**容器** | 跑一個 nginx 任務並用公有 IP 連線 |
+
+### Step 16-1　CloudTrail 事件歷史記錄
+
+**進入路徑**：CloudTrail →「事件歷史記錄」→ 查詢屬性「事件名稱」= `CreateVpcPeeringConnection`
+
+![事件歷史記錄](images/lab16-01-cloudtrail-event-history.jpg)
+
+1. 新版頁首公告：**CloudTrail Lake 自 2026 年 5 月 31 日起不再對新客戶開放**，類似需求請改用 Amazon CloudWatch（舊教材若寫「用 CloudTrail Lake 做 SQL 查詢」要留意）。
+2. 「事件歷史記錄會顯示過去 **90 天**的**管理事件**」：不需要建立追蹤（Trail）就有，免費；但只有管理事件、只保留 90 天、只在本區域。
+3. 查詢屬性：事件名稱 `CreateVpcPeeringConnection`（也可以用使用者名稱、資源名稱、事件來源等篩選）。
+4. 找到 1 筆：使用者名稱 **`saa-admin`**、時間 2026-11-04 00:36:32（台北時間）。
+5. 「建立 Athena 資料表」：替送到 S3 的追蹤日誌一鍵建立 Athena 表格（需要先有 Trail）。
+
+### Step 16-2　事件紀錄 JSON：userIdentity
+
+**進入路徑**：點事件名稱 → 往下捲
+
+![事件紀錄](images/lab16-02-cloudtrail-event-record.jpg)
+
+1. 參考的資源：`AWS::EC2::VPCPeeringConnection pcx-00880416443e4a1a0` 以及兩個 VPC；右邊「啟用 AWS Config 資源記錄」——CloudTrail 和 Config 是互補的（**誰做的** vs **變成什麼樣**）。
+2. `"type": "IAMUser"`（用角色時是 `AssumedRole`，root 是 `Root`）。
+3. `principalId` 與 `arn: arn:aws:iam::123456789012:user/saa-admin`（截圖中 principalId 與臨時存取金鑰 ID 已替換為範例值）。
+4. `"userName": "saa-admin"`；往下還有 `sourceIPAddress`、`userAgent`、`requestParameters`、`responseElements`。主控台操作也會產生 `accessKeyId`（`ASIA…` 開頭的**臨時**憑證）。
+
+> **實務必做**：建立一條**組織層級、多區域**的 Trail，送到 Log Archive 帳號的 S3（開啟日誌檔案驗證、SSE-KMS、S3 Object Lock），需要時再加**資料事件**（S3 物件層級、Lambda Invoke）與 **CloudTrail Insights**（API 呼叫量異常）。
+
+### Step 16-3　AWS Config 設定：只記錄 Security Group
+
+**進入路徑**：AWS Config →「開始使用」（另一個「1-click 設定」會記錄所有資源類型）
+
+![Config 設定](images/lab16-03-config-setup.jpg)
+
+1. 記錄策略選「**特定資源類型**」：預設是「具有可自訂覆寫的所有資源類型」，費用依記錄的**組態項目數量**計算，練習時只記需要的類型。
+2. 資源類型 **AWS EC2 SecurityGroup**、頻率「**持續**」（變更就記錄；另一個「每日」較便宜）。
+3. IAM 角色「建立 AWS Config **服務連結角色**」。
+4. 交付管道：建立 S3 儲存貯體 `config-bucket-123456789012`，組態快照與歷史會寫到 `/AWSLogs/<帳號>/Config/us-east-1`。
+5. Amazon SNS 主題：不串流（勾選後組態變更會發通知，用 Email 可能會收到大量信）。
+6. 按「下一個」。
+
+### Step 16-4　規則：受管規則 restricted-ssh
+
+![restricted-ssh](images/lab16-04-config-rule-restricted-ssh.jpg)
+
+1. AWS 受管規則 **753** 條（本次畫面）。
+2. 搜尋並篩選「名稱 = restricted-ssh」。
+3. 勾選 `restricted-ssh`：資源類型 AWS::EC2::SecurityGroup、觸發條件類型 **HYBRID**（組態變更時 + 定期），檢查 SG 是否允許 0.0.0.0/0 的 SSH（22）入站。
+4. 「下一個」→ 檢閱 →「確認」。
+
+接著在 CloudShell 故意建立一個**不合規**的 SG（只建立、不掛到任何執行個體）：
+
+```bash
+BAD=$(aws ec2 create-security-group --group-name saa-bad-ssh-sg --vpc-id <預設 VPC ID> \
+  --description 'Config demo: SSH open to the world (do not attach)' --query GroupId --output text)
+aws ec2 authorize-security-group-ingress --group-id $BAD --protocol tcp --port 22 --cidr 0.0.0.0/0
+```
+
+### Step 16-5　Athena 查詢編輯器：先設定查詢結果位置
+
+**準備資料**（CloudShell）：建立 `saa-lab-athena-<帳號>` Bucket，上傳 `test-data/site/orders.csv` 到 `orders/` 前綴。
+
+```bash
+B=saa-lab-athena-$(aws sts get-caller-identity --query Account --output text)
+aws s3 mb s3://$B && aws s3 cp test-data/site/orders.csv s3://$B/orders/orders.csv
+```
+
+**進入路徑**：Amazon Athena →「查詢編輯器」
+
+![Athena 編輯器](images/lab16-05-athena-editor.jpg)
+
+1. 工作群組 `primary`。
+2. 提示「執行第一個查詢之前，您需要在 Amazon S3 中設定查詢結果位置」：Athena 會把每次查詢的結果寫成 CSV 到這個位置。
+3. 按「編輯設定」。（頁首另有「在 Amazon SageMaker Unified Studio 中查詢」的新入口。）
+
+### Step 16-6　查詢結果位置
+
+![結果位置](images/lab16-06-athena-result-location.jpg)
+
+1. 查詢結果的位置 `s3://saa-lab-athena-123456789012/results/`。
+2. 預期儲存貯體擁有者、指派完全控制：跨帳號寫入結果時才需要。
+3. 「加密查詢結果」：可選 SSE-S3 / SSE-KMS / CSE-KMS。
+4. 按「儲存」。
+
+> **實作時的觀察（照實記錄）**：按「儲存」後回到「查詢設定」，查詢結果位置仍顯示「-」，編輯器也繼續要求設定。改用 CLI 設定工作群組才生效：
+>
+> ```bash
+> aws athena update-work-group --work-group primary \
+>   --configuration-updates "ResultConfigurationUpdates={OutputLocation=s3://$B/results/}"
+> ```
+>
+> 正式環境建議建立**自己的工作群組**、勾選「覆寫用戶端設定」，並設定每次查詢掃描量上限控制成本。
+
+### Step 16-7　建立資料庫與外部資料表
+
+![建立資料表](images/lab16-07-athena-create-table.jpg)
+
+先執行 `CREATE DATABASE IF NOT EXISTS saa_lab;`，再執行（`athena/orders.sql`）：
+
+```sql
+CREATE EXTERNAL TABLE IF NOT EXISTS saa_lab.orders (
+  order_id   int,
+  customer   string,
+  region     string,
+  amount     int,
+  created_at string
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+LOCATION 's3://saa-lab-athena-<帳號>/orders/'
+TBLPROPERTIES ('skip.header.line.count'='1');
+```
+
+1. 查詢狀態打勾（成功）。
+2. `EXTERNAL TABLE`：只在 **Glue Data Catalog** 建立結構描述，資料仍留在 S3——**Schema-on-Read**，刪表不會刪資料。
+3. `LOCATION` 指向**前綴**（資料夾），不是單一檔案；`skip.header.line.count` 略過標題列。
+4. 「再次執行」。
+
+### Step 16-8　查詢 S3 上的 CSV
+
+![查詢結果](images/lab16-08-athena-query-result.jpg)
+
+```sql
+SELECT order_id, customer, region, amount
+FROM saa_lab.orders
+WHERE amount > 100
+ORDER BY amount DESC;
+```
+
+1. 已完成：在佇列中 110 毫秒、執行 579 毫秒、**掃描的資料 0.27 KB**——Athena **依掃描量計費**（每 TB 計價，每次查詢有最低計費量），所以實務上要把資料轉成 **Parquet / ORC**、加上**分割區**、壓縮，掃描量可以降一到兩個數量級。
+2. 結果 3 筆：1005 erin 310、1003 carol 250、1001 alice 120。
+3. 「下載結果 CSV」（同時也寫到了查詢結果位置）。
+
+### Step 16-9　Config 規則詳細資訊
+
+**進入路徑**：AWS Config →「規則」→ `restricted-ssh`
+
+![規則詳細](images/lab16-09-config-rule-detail.jpg)
+
+1. 這條規則對應的**合規框架**：NIST 800-53、CIS AWS Benchmark、PCI-DSS v3.2.1 / v4.0.1、ISO 27001、SOC 2……（一致性套件 Conformance Pack 就是把這些規則打包部署）。
+2. 行為「**偵測性**」：Config 規則只會**回報**，不會阻止建立（要阻止請用 SCP 或 IAM）。
+3. 別名 `AWS-GR_RESTRICTED_SSH`：Control Tower 的 guardrail 也是用同一條規則。
+
+### Step 16-10　不合規資源
+
+![不合規](images/lab16-10-config-noncompliant.jpg)
+
+1. 上次評估狀態「成功」、上次成功評估時間 01:08、偵測合規「**未合規資源**」。
+2. 觸發條件類型：**定期** + **組態變更**。
+3. 範圍內資源篩選「未合規」……
+4. ……列出 `sg-03084…`（`saa-bad-ssh-sg`）EC2 SecurityGroup、**未合規**。
+
+> 選取資源後可以按「修補」：Config 支援用 **SSM Automation** 文件自動修補（例如 `AWS-DisablePublicAccessForSecurityGroup`），這就是「偵測 + 自動修正」的標準答案。
+
+### Step 16-11　ECS：建立叢集 saa-ecs-cluster
+
+**進入路徑**：Amazon Elastic Container Service →「叢集」→「建立叢集」
+
+![建立叢集](images/lab16-11-ecs-create-cluster.jpg)
+
+1. 叢集名稱 `saa-ecs-cluster`（預設帶入隨機名稱，例如 `quiet-rabbit-0vyoho`）。
+2. 基礎設施「**僅限 Fargate**」（預設）：無伺服器，不必管理 EC2。
+3. 「Fargate 和**受管執行個體**」（新）：ECS 代管 EC2 的修補與擴展，但可以挑執行個體類型（GPU、特定 CPU）。
+4. 「Fargate 和**自我管理**執行個體」：傳統的 EC2 啟動類型，自己負責 AMI、修補、擴展。
+5. 按「建立」。左側選單還有新的「**Express 模式**」（一鍵把映像部署成含 ALB 的服務）與「閘道」。
+
+> **實作時的觀察（照實記錄）**：主控台按「建立」後沒有錯誤也沒有建立叢集（叢集清單與 CloudFormation 都找不到），改用 CLI 建立：
+>
+> ```bash
+> aws ecs create-cluster --cluster-name saa-ecs-cluster --capacity-providers FARGATE FARGATE_SPOT \
+>   --default-capacity-provider-strategy capacityProvider=FARGATE,weight=1
+> ```
+
+### Step 16-12　任務定義 saa-nginx
+
+**進入路徑**：ECS →「任務定義」→「建立新的任務定義」
+
+![任務定義](images/lab16-12-ecs-task-definition.jpg)
+
+1. 啟動類型 AWS Fargate；作業系統 Linux/X86_64；網路模式 **awsvpc**（Fargate 固定，每個任務有自己的 ENI 與私有 IP，可以直接套 SG）。
+2. 任務尺寸：預設 **1 vCPU / 3 GB**，改成 **.25 vCPU / .5 GB**（Fargate 最小組合）；CPU 與記憶體必須是相容的組合，改 CPU 後主控台會自動把記憶體調到相容的最低值。
+3. 任務角色「-」：**容器內的程式**呼叫 AWS API 用的角色（例如讀 S3）。
+4. 任務**執行**角色「建立預設角色」→ `ecsTaskExecutionRole`：**ECS 代理程式**拉映像（ECR）、寫 CloudWatch Logs、讀 Secrets 用的角色。**兩個角色的差別是考試常考點**。
+5. 容器名稱 `web`、基本容器「是」。
+6. 映像 URI `public.ecr.aws/nginx/nginx:stable-alpine`（ECR Public，不需要登入）。
+7. 連接埠映射：容器連接埠 **80**、TCP、應用程式通訊協定 HTTP。
+8. 捲到最下按「建立」→ `saa-nginx:1`。
+
+### Step 16-13　執行任務：環境
+
+**進入路徑**：任務定義 `saa-nginx:1` →「部署」→「執行任務」
+
+![執行任務 環境](images/lab16-13-ecs-run-task-env.jpg)
+
+1. 現有叢集 `saa-ecs-cluster`（用 CLI 建好後按重新整理才出現）。
+2. 運算選項「**容量供應商策略**」（建議）……
+3. ……或「啟動類型」（直接指定 FARGATE / EC2）。
+4. 容量供應商 **FARGATE**、基礎 0、權數 1（叢集預設；可以混用 **FARGATE_SPOT**，最多便宜約 70%，但可能被中斷）。
+
+> 「執行任務」= 跑一次就結束的工作（批次、遷移）；要常駐並自動補回失敗的任務、掛 ALB，請建立「**服務**」（Service）。
+
+### Step 16-14　執行任務：聯網
+
+![執行任務 聯網](images/lab16-14-ecs-run-task-network.jpg)
+
+1. VPC 預設 VPC、子網路預設全選 6 個 AZ（Fargate 會挑一個放任務）。
+2. 安全群組「使用現有的安全群組」。
+3. 移除 `default`，改選 `saa-ecs-sg`（CloudShell 預先建立，只開 TCP 80 給 0.0.0.0/0）。
+4. 公有 IP「**開啟**」：任務在公有子網路，需要公有 IP 才能從 ECR Public 拉映像（私有子網路則要 NAT 或 VPC 端點）。
+5. 捲到最下按「建立」→ 任務 `a8d1033c143947f1ab11986a356ae0ae`。
+
+### Step 16-15　任務執行中
+
+**進入路徑**：叢集 → 任務 → 點任務 ID
+
+![任務執行中](images/lab16-15-fargate-task-running.jpg)
+
+1. 上次狀態「**執行中**」。
+2. 任務生命週期：已建立 → 正在佈建（**已連接網路介面**：awsvpc 為任務建立 ENI）→ 待處理 → 執行中。
+3. 容器 `web` 的映像 URI；「組態」頁往下的「網路」區塊有私有 IP 172.31.71.61 與公有 IP 44.221.43.184。
+
+### Step 16-16　從 CloudShell 連線
+
+```bash
+curl -s -I http://44.221.43.184/ | head -3
+curl -s http://44.221.43.184/ | grep -o '<title>.*</title>'
+```
+
+![curl Fargate](images/lab16-16-fargate-curl.jpg)
+
+1. 任務 ID。
+2. `HTTP/1.1 200 OK`、`Server: nginx/1.30.6`。
+3. `<title>Welcome to nginx!</title>`。
+
+### CLI 等效
+
+```bash
+./scripts/16-governance-data.sh
+```
+
+### 實務情境
+
+- **銀行**：稽核要求「所有 API 呼叫保留 7 年、不可竄改」→ 組織 Trail + S3 Object Lock（Compliance 模式）；監理要求「不得有對外開放的 SSH」→ Config 一致性套件 + 自動修補，月報直接匯出合規儀表板。
+- **製造**：產線感測資料以 Parquet 依日期分割存到 S3，品管人員用 Athena 直接下 SQL 找異常批號，不必建資料倉儲；固定報表再交給 QuickSight。
+- **零售**：促銷期間的推薦服務打包成容器跑在 ECS Fargate，服務依 ALB 請求數自動擴展；夜間批次用 Fargate Spot 跑，成本再降一截。
+
+### 延伸練習
+
+1. 建立一條多區域 Trail 送到 S3，再用事件歷史記錄的「建立 Athena 資料表」查詢 `eventName = 'ConsoleLogin'`。
+2. 在 Config 對 `saa-bad-ssh-sg` 設定自動修補（`AWS-DisablePublicAccessForSecurityGroup`），觀察規則變回合規。
+3. 用 Glue 爬蟲（Crawler）自動推斷 `orders/` 的結構描述，再用 CTAS 把資料轉成 Parquet 並依 `region` 分割，比較掃描量。
+4. 把 `saa-nginx` 改成「服務」並掛 ALB（可沿用 Lab 4 的作法），desired count 2，手動停止一個任務觀察 ECS 自動補回。
+
+### 考試重點
+
+| 需求 | 答案 |
+|---|---|
+| 誰在什麼時候做了什麼 API 呼叫 | **CloudTrail**（事件歷史 90 天免費；長期保存要建 Trail 到 S3） |
+| 偵測可疑 API 呼叫量 | **CloudTrail Insights** |
+| 資源組態歷史、合規評估 | **AWS Config**（規則 + 一致性套件 + SSM 自動修補） |
+| 阻止（不是偵測）不合規操作 | **SCP** / IAM 政策；Config 只會偵測 |
+| 直接用 SQL 查 S3、無伺服器、按掃描量計費 | **Athena**（Parquet / 分割區 / 壓縮降低成本） |
+| 自動推斷 S3 資料結構、ETL | **AWS Glue**（Crawler、Data Catalog、ETL Job） |
+| PB 級資料倉儲、複雜 BI | **Redshift**（Spectrum 可查 S3） |
+| 不管伺服器跑容器 | **ECS / EKS on Fargate** |
+| 容器內程式要讀 S3 | **任務角色**（Task Role）；拉映像、寫日誌是**任務執行角色** |
+| 便宜、可中斷的容器工作 | **Fargate Spot** |
+| 已有 Kubernetes 經驗 / 工具鏈 | **EKS** |
+| 私有映像倉庫、映像掃描 | **ECR**（基本 / 增強掃描） |
+
+---
 ## Lab 99：清除資源
 
 > **本 Lab 操作身分與環境**
@@ -2681,7 +3861,8 @@ curl -s https://<bucket>.s3.us-east-1.amazonaws.com/index.html                # 
 ### 腳本清除（建議）
 
 ```bash
-./scripts/99-cleanup.sh     # 會要求輸入 yes 確認
+./scripts/99-cleanup.sh               # 會要求輸入 yes 確認；最後會自動呼叫 98-cleanup-labs13-16.sh
+./scripts/98-cleanup-labs13-16.sh     # 只做了 Lab 13–16 時，單獨執行這支即可
 ```
 
 腳本會先讀 `~/.saa-lab-state`；讀不到（例如全部用主控台建立）時改用名稱 / 標籤查找：`saa-lab-vpc`、`saa-app-alb`、`saa-app-tg`、`saa-alerts`、`saa-order-queue`、`saa.internal`、`alias/saa-lab-key`、名稱為 `saa-lab-site` 的 CloudFront 分發，以及所有 `saa-lab-site-` 開頭的 Bucket。中途失敗（例如 SG 還有網路介面在釋放）可以稍後重跑。
@@ -2703,6 +3884,7 @@ curl -s https://<bucket>.s3.us-east-1.amazonaws.com/index.html                # 
 | 11 | NAT 閘道 → **釋放彈性 IP** → S3 閘道端點 | NAT 與彈性 IP 會持續計費 |
 | 12 | SG（先撤銷互相參照的規則）→ 子網路 → 路由表 → IGW（先卸離）→ VPC | 依賴關係 |
 | 13 | CloudFront 停用部署完成 → 刪除分發 → 刪除 OAC | — |
+| 14 | **Lab 13–16**（`98-cleanup-labs13-16.sh`）：ECS 任務 → 叢集 → 任務定義；Config 停止記錄 → 規則 → 交付管道 → 記錄器 → `config-bucket-*`；Glue 表 / 資料庫 → Athena Bucket；EventBridge 目標 → 規則 → 狀態機 → REST API → Lambda；主控台建立的角色；Flow Log → Peering 路由 → Peering；終止執行個體 → EFS 掛載目標 → EFS；AMI（含其快照）→ 資料快照 → 磁碟區；peer VPC；預設 VPC 中的 Lab SG | AMI 取消註冊後快照仍在，要另外刪；`ecsTaskExecutionRole` 是 ECS 共用預設角色，腳本不刪，確定沒其他用途再手動刪 |
 | 保留 | `saa-admin`、`saa-admins` | 下次練習使用；若要刪，請以 root 或另一位管理員刪除（先刪 login profile、MFA、卸離政策、移出群組） |
 
 ### 清除後檢查
@@ -2747,7 +3929,14 @@ aws iam list-users --query 'Users[].UserName'      # 應只剩 saa-admin（以�
 | 21 | 有版本控制的 Bucket 刪不掉 | 還有舊版本與刪除標記 | 刪除所有 Version 與 DeleteMarker（或主控台「清空」） |
 | 22 | CloudFront 刪不掉 | 分發仍在啟用狀態 | 先停用，等部署完成 |
 | 23 | SNS → SQS 訊息沒進佇列 | 從 SNS 端訂閱時沒改 SQS 存取政策 | 從 SQS 端「訂閱 Amazon SNS 主題」，主控台會自動加政策 |
-| 24 | 主控台改版（S3 帳戶區域命名空間、CloudFront 方案、區域性 NAT、Lambda 新建立頁、KMS 新精靈） | AWS 持續更新 | 以欄位名稱與觀念為準 |
+| 24 | 主控台改版（S3 帳戶區域命名空間、CloudFront 方案、區域性 NAT、Lambda 新建立頁、KMS 新精靈、Lambda 耐久性執行 / EC2 容量提供者、API Gateway 安全政策與端點存取模式、EventBridge 增強建置器、ECS 受管執行個體 / Express 模式、CloudTrail Lake 停止新客戶） | AWS 持續更新 | 以欄位名稱與觀念為準 |
+| 25 | 建立 EBS 磁碟區時容量變成 100 GiB、加密後 KMS 金鑰是空的 | 新版預設值 | 改成需要的大小；手動選「(預設) aws/ebs」 |
+| 26 | 建立 AMI 後，資料磁碟區的掛載不見了 | 「重新啟動執行個體」預設勾選，且沒寫 `/etc/fstab` | 用 UUID 寫入 fstab（加 `nofail`）；或建立 AMI 時取消重新開機（自行承擔一致性） |
+| 27 | AMI 把資料磁碟區也包進去 | 建立映像預設包含所有連接的 EBS | 在「執行個體磁碟區」移除不需要的列 |
+| 28 | EFS 通用 DNS 名稱解析失敗 | 掛載目標還在 creating 就查詢，失敗結果被快取 | 等掛載目標 available；或改用 AZ 專屬名稱 `us-east-1b.fs-xxx.efs...` / IP |
+| 29 | EFS 精靈在 6 個 AZ 都建掛載目標，而且套用 `default` SG | 主控台預設 | 只留需要的 AZ、SG 改成專用的 NFS SG |
+| 30 | Athena「查詢結果位置」儲存後沒有生效；ECS「建立叢集」按下去沒有建立 | 本次實測的主控台行為（原因不明） | 改用 CLI：`aws athena update-work-group`、`aws ecs create-cluster`（見 Lab 16） |
+| 31 | API Gateway 改了方法卻沒效果 | REST API 變更要**部署到階段**才生效 | 「部署 API」→ 選階段 |
 
 ---
 
@@ -2778,6 +3967,15 @@ aws iam list-users --query 'Users[].UserName'      # 應只剩 saa-admin（以�
 | 「地端大量資料離線搬遷」 | Snowball |
 | 「地端持續同步到 AWS」 | DataSync；檔案閘道 → Storage Gateway |
 | 「資料庫遷移、異質引擎」 | DMS + SCT |
+| 「EBS 換 AZ / 換區域」 | 快照（跨區域先複製快照） |
+| 「封鎖特定 IP」 | NACL Deny（SG 不能 Deny） |
+| 「兩個 VPC 互通、不可遞移」 | VPC Peering；大量 VPC → Transit Gateway |
+| 「多步驟流程、人工核准、重試」 | Step Functions |
+| 「依事件內容路由、SaaS 事件」 | EventBridge |
+| 「API 節流、用量計畫、API 金鑰」 | API Gateway REST API |
+| 「資源組態是否合規、自動修補」 | AWS Config + SSM Automation |
+| 「直接用 SQL 查 S3」 | Athena（Parquet + 分割區降成本） |
+| 「不管伺服器跑容器」 | ECS / EKS on Fargate |
 | 「RTO/RPO 最小、成本最高」 | Multi-Site Active/Active；成本低到高：Backup & Restore → Pilot Light → Warm Standby → Active/Active |
 
 更多練習題請見 [`docs/practice-questions.md`](docs/practice-questions.md)。
@@ -2789,16 +3987,20 @@ aws iam list-users --query 'Users[].UserName'      # 應只剩 saa-admin（以�
 ```text
 aws-saa-preparation/
 ├── README.md                      # 本教學（Step by Step + 截圖）
-├── images/                        # 121 張主控台完整長截圖（labNN-MM-*.jpg，帳號 ID 已遮蔽）
+├── images/                        # 189 張主控台截圖（v2 121 張 + v3 Lab 13–16 68 張）（labNN-MM-*.jpg，帳號 ID 已遮蔽）
 ├── scripts/
 │   ├── 00-env.sh                  # 共用變數、狀態檔、隨機密碼產生與登入資訊輸出
 │   ├── 00-admin-user.sh           # Lab 0：saa-admins + saa-admin（root 或管理員執行一次）
-│   ├── 01-iam.sh … 12-kms-secrets.sh
-│   └── 99-cleanup.sh              # 依相依順序清除（保留 saa-admin / saa-admins）
+│   ├── 01-iam.sh … 16-governance-data.sh
+│   ├── 98-cleanup-labs13-16.sh    # Lab 13–16 清除（可單獨執行）
+│   └── 99-cleanup.sh              # 依相依順序清除全部（保留 saa-admin / saa-admins）
 ├── userdata/web-userdata.sh       # EC2 User Data（nginx + IMDSv2）
 ├── lambda/
 │   ├── lambda_function.py         # 訂單 API
-│   └── events/*.json              # 測試事件
+│   ├── events/*.json              # 測試事件
+│   └── hello/lambda_function.py   # Lab 15 API Gateway Proxy 範例
+├── stepfunctions/order-flow.asl.json  # Lab 15 狀態機定義（Choice + Wait）
+├── athena/orders.sql              # Lab 16 建表與查詢
 ├── policies/                      # 信任政策、最小權限政策、OAC Bucket Policy、生命週期
 ├── test-data/site/                # 靜態網站與 orders.csv 測試資料
 ├── docs/practice-questions.md     # 模擬練習題與解析
@@ -2807,4 +4009,4 @@ aws-saa-preparation/
 
 ## 說明
 
-截圖取自作者個人 AWS 帳號，帳號 ID 已替換為 `123456789012`（部分畫面顯示為 `1234-5678-9012`）。瀏覽器測試圖（lab03-06、lab04-14、lab04-15、lab09-09）上方的網址列為後製示意。AWS 與相關服務名稱為 Amazon.com, Inc. 或其關係企業之商標。
+截圖取自作者個人 AWS 帳號，帳號 ID 已替換為 `123456789012`（部分畫面顯示為 `1234-5678-9012`）。瀏覽器測試圖（lab03-06、lab04-14、lab04-15、lab09-09）上方的網址列為後製示意。Lab 13–16 截圖中的 CloudTrail principalId / 臨時存取金鑰 ID 已替換為範例值；終端機與主控台中的公有 IP 均為已釋放的暫時位址。AWS 與相關服務名稱為 Amazon.com, Inc. 或其關係企業之商標。
