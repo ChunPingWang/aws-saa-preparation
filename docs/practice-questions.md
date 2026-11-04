@@ -1,4 +1,4 @@
-# SAA-C03 模擬練習題（對應 12 個 Lab）
+# SAA-C03 模擬練習題（對應 Lab 1–16）
 
 > 題目為作者依考試指南範圍自行撰寫的情境題，用來檢查 Lab 觀念，**不是官方考題**。
 > 建議先作答，再展開解析。
@@ -328,4 +328,164 @@ RDS MySQL 必須在單一 AZ 故障時自動恢復，且應用程式不需修改
 <details><summary>答案與解析</summary>
 
 **C**。Warm Standby 在備援區保持縮小規模的完整環境，切換時擴容即可。Pilot Light 只保留核心（如資料庫複寫），RTO 較長；Active/Active 成本最高。
+</details>
+
+---
+
+## v3 新增（Lab 13–16）
+
+### Q26（Lab 13｜彈性）
+us-east-1a 的 EC2 掛著一顆 500 GiB 的 gp3 資料磁碟區，現在要把這台工作負載搬到 us-east-1c。最直接的做法是？
+
+- A. 卸離磁碟區，直接連接到 us-east-1c 的新執行個體
+- B. 對磁碟區建立快照，在 us-east-1c 由快照建立磁碟區並連接
+- C. 開啟 EBS Multi-Attach
+- D. 把磁碟區類型改成 io2
+
+<details><summary>答案與解析</summary>
+
+**B**。EBS 磁碟區綁定單一 AZ，只能連接同 AZ 的執行個體；快照是區域性的，可在任何 AZ 還原（Lab 13 Step 13-8）。Multi-Attach 也只限同 AZ。
+</details>
+
+### Q27（Lab 13｜效能）
+多台分散在三個 AZ 的 Linux Web 伺服器需要同時讀寫同一批使用者上傳檔案，且容量會持續成長。最適合的儲存？
+
+- A. 每台各掛一顆 EBS，用 rsync 同步
+- B. Instance Store
+- C. Amazon EFS（區域性）
+- D. FSx for Windows File Server
+
+<details><summary>答案與解析</summary>
+
+**C**。EFS 是 NFS、區域性、可跨 AZ 同時掛載、自動擴展容量（Lab 13 Step 13-17）。FSx for Windows 是 SMB，適合 Windows。
+</details>
+
+### Q28（Lab 13｜安全）
+公司要求所有 EBS 都必須加密，但有一顆既有的未加密磁碟區。如何在最少停機下改為加密？
+
+- A. 在磁碟區上直接勾選「加密」
+- B. 建立快照 → 複製快照並啟用加密 → 由加密快照建立新磁碟區 → 替換
+- C. 開啟帳戶層級的 EBS 預設加密，既有磁碟區會自動加密
+- D. 用 KMS 的 ReEncrypt API
+
+<details><summary>答案與解析</summary>
+
+**B**。既有磁碟區無法直接改成加密；預設加密只影響之後新建的磁碟區。
+</details>
+
+### Q29（Lab 14｜安全）
+安全團隊發現某個 IP 範圍正在掃描公有子網路中的所有執行個體，需要立即在子網路層級封鎖該範圍。應使用？
+
+- A. Security Group 加入 Deny 規則
+- B. Network ACL 加入編號較小的 Deny 規則
+- C. 路由表加入黑洞路由
+- D. VPC Flow Logs
+
+<details><summary>答案與解析</summary>
+
+**B**。SG 只能 Allow；NACL 可以 Deny，依規則編號由小到大比對（Lab 14 Step 14-11）。Flow Logs 只記錄、不阻擋。
+</details>
+
+### Q30（Lab 14｜彈性）
+VPC-A 與 VPC-B、VPC-B 與 VPC-C 各自建立了 VPC Peering。VPC-A 的執行個體無法連到 VPC-C，原因是？
+
+- A. 需要在 VPC-B 啟用 IP 轉送
+- B. VPC Peering 不支援遞移路由，需要 A–C 直接 Peering 或改用 Transit Gateway
+- C. VPC-C 的 SG 沒有允許 VPC-B 的 CIDR
+- D. Peering 只支援同一個 AZ
+
+<details><summary>答案與解析</summary>
+
+**B**。Peering 是一對一、不可遞移；VPC 數量多時用 Transit Gateway。
+</details>
+
+### Q31（Lab 14｜安全）
+SG 允許 ICMP，但 ping 不通；Flow Logs 顯示 REJECT。最可能的原因？
+
+- A. 執行個體沒有公有 IP
+- B. 子網路的 NACL 拒絕了該流量（或沒有允許回應方向）
+- C. 沒有 IAM 角色
+- D. Flow Logs 的篩選設成 REJECT
+
+<details><summary>答案與解析</summary>
+
+**B**。NACL 無狀態，進出方向都要允許；SG 有狀態。Lab 14 Step 14-13、14-14 實測。
+</details>
+
+### Q32（Lab 15｜效能／成本）
+行動 App 的後端 API 要提供合作夥伴使用，需依合作夥伴分別限制每秒請求數與每日配額，並以 API 金鑰識別。應使用？
+
+- A. Application Load Balancer + Lambda
+- B. API Gateway HTTP API
+- C. API Gateway REST API 搭配用量計畫與 API 金鑰
+- D. Lambda 函式 URL
+
+<details><summary>答案與解析</summary>
+
+**C**。用量計畫（Usage Plans）與 API 金鑰是 REST API 的功能；超量回 429。
+</details>
+
+### Q33（Lab 15｜彈性）
+訂單建立後需依序執行：信用檢查 → 若金額大於 10 萬等待人工核准（可能數天）→ 扣庫存 → 通知；每一步失敗要自動重試並保留執行紀錄。最少營運負擔的方案？
+
+- A. 一支 Lambda 依序呼叫
+- B. SQS 串接多個 Lambda
+- C. Step Functions 標準工作流程（Choice + waitForTaskToken + Retry）
+- D. Step Functions 快速工作流程
+
+<details><summary>答案與解析</summary>
+
+**C**。標準工作流程可執行最長 1 年、內建重試與執行歷史；快速工作流程上限 5 分鐘。Lambda 最長 15 分鐘。
+</details>
+
+### Q34（Lab 15｜解耦）
+多個微服務要訂閱「訂單建立」事件，但每個服務只關心特定條件（例如某些地區、金額區間），也要能接收 SaaS 合作夥伴送來的事件。最適合？
+
+- A. SNS 標準主題
+- B. Amazon EventBridge 事件匯流排 + 規則的事件模式
+- C. Kinesis Data Streams
+- D. SQS FIFO
+
+<details><summary>答案與解析</summary>
+
+**B**。EventBridge 依事件內容路由、支援合作夥伴事件來源與 Archive/Replay（Lab 15 Step 15-15、15-19：不符合模式的事件不會觸發）。
+</details>
+
+### Q35（Lab 16｜安全）
+稽核人員要知道「上週是誰刪除了生產環境的 S3 Bucket」。應查詢？
+
+- A. AWS Config 資源時程
+- B. AWS CloudTrail
+- C. VPC Flow Logs
+- D. CloudWatch Metrics
+
+<details><summary>答案與解析</summary>
+
+**B**。CloudTrail 記錄 API 呼叫的身分、時間、來源 IP。Config 記錄資源組態的變化與合規狀態，兩者互補（Lab 16 Step 16-2）。
+</details>
+
+### Q36（Lab 16｜安全）
+公司要持續偵測所有允許 0.0.0.0/0 存取 SSH 的 Security Group，並自動移除該規則。最少營運負擔的方式？
+
+- A. 每天用 Lambda 掃描所有 SG
+- B. AWS Config 受管規則 restricted-ssh + SSM Automation 自動修補
+- C. GuardDuty
+- D. 用 SCP 禁止建立 SG
+
+<details><summary>答案與解析</summary>
+
+**B**。Config 規則偵測、SSM Automation 修補。SCP 是預防，但無法精準到「規則內容」且會擋掉所有 SG 操作。
+</details>
+
+### Q37（Lab 16｜成本）
+資料湖在 S3 存了數 TB 的 CSV 日誌，分析師偶爾用 Athena 查詢，費用偏高。最有效的降本方式？
+
+- A. 改用 S3 Glacier Deep Archive
+- B. 轉成 Parquet 並依日期分割、壓縮，查詢時帶分割區條件
+- C. 把 Athena 換成 RDS
+- D. 增加 Athena 工作群組數量
+
+<details><summary>答案與解析</summary>
+
+**B**。Athena 依掃描量計費；欄式格式 + 分割區 + 壓縮大幅降低掃描量。Glacier 的資料不能直接用 Athena 查。
 </details>

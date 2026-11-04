@@ -16,6 +16,12 @@ N="${PREFIX}-lab"
 read -r -p "確定要刪除所有 ${PREFIX} Lab 資源（保留 ${PREFIX}-admin / ${PREFIX}-admins）？輸入 yes 繼續：" ans
 [ "$ans" = "yes" ] || { echo "已取消"; exit 0; }
 
+# ---------- Lab 13–16（預設 VPC、獨立資源）先清，避免 saa-ec2-ssm-role 被先刪掉時執行個體還在 ----------
+if [ -x "$(dirname "$0")/98-cleanup-labs13-16.sh" ]; then
+  log "0. Lab 13–16：呼叫 98-cleanup-labs13-16.sh"
+  SAA_CLEANUP_CONFIRMED=1 bash "$(dirname "$0")/98-cleanup-labs13-16.sh"
+fi
+
 # ---------- 依名稱補齊 ID（主控台建立的資源） ----------
 VPC_ID="${VPC_ID:-$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=${N}-vpc" --query 'Vpcs[0].VpcId' --output text)}"
 [ "$VPC_ID" = "None" ] && VPC_ID=""
