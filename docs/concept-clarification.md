@@ -11,6 +11,7 @@
 3. [S3 Infrequent Access（Standard-IA 與 One Zone-IA）](#3-s3-infrequent-accessstandard-ia-與-one-zone-ia)
 4. [RPO 與 RTO](#4-rpo-與-rto)
 5. [Elastic Load Balancing（ALB、NLB、GWLB、CLB）](#5-elastic-load-balancingalbnlbgwlbclb)
+6. [AWS Network Firewall](#6-aws-network-firewall)
 
 ---
 
@@ -357,7 +358,80 @@ Elastic Load Balancing（ELB）是託管的負載平衡服務，負責把流量�
 
 ---
 
+## 6. AWS Network Firewall
+
+### 一句話定位
+
+部署在 VPC 裡的**託管式網路防火牆＋入侵防禦（IPS）**。它檢查所有經過的 VPC 流量（L3–L7），依規則放行、丟棄或告警，不用自己架設與維護防火牆主機。
+
+### 核心特性
+
+| 項目 | 內容 |
+|---|---|
+| 部署位置 | 在每個 AZ 建一個專用的 **firewall subnet**，裡面放 firewall endpoint；透過**修改路由表**把流量導進 endpoint 檢查 |
+| 無狀態規則（stateless） | 依 5-tuple（來源／目的 IP、port、協定）逐封包判斷，可以放行、丟棄或轉給有狀態引擎 |
+| 有狀態規則（stateful） | 追蹤連線狀態，支援 **Suricata 相容的 IPS 規則**，可用特徵比對偵測已知攻擊 |
+| 網域過濾 | **domain list** 規則依 HTTP Host header 或 TLS SNI 比對網域，可做出站白名單或黑名單 |
+| TLS 檢查 | 可以解密 TLS 流量後檢查內容，再重新加密（需搭配 ACM 憑證） |
+| 受管規則 | AWS 提供已知惡意網域、威脅特徵等受管規則群組 |
+| 記錄 | alert log、flow log、TLS log，可送到 S3、CloudWatch Logs、Kinesis Data Firehose |
+| 擴展與可用性 | 自動擴展；每個 AZ 一個 endpoint，所以 endpoint 要跟著 AZ 部署 |
+| 多帳號管理 | 用 **AWS Firewall Manager** 統一把防火牆政策套用到 Organizations 中的所有帳號 |
+| 計費 | 依 endpoint 小時數＋處理的流量（GB）計費 |
+
+### 常見部署架構
+
+| 架構 | 說明 |
+|---|---|
+| **分散式** | 每個 VPC 各自部署 Network Firewall，檢查該 VPC 進出網際網路的流量 |
+| **集中式（inspection VPC）** | 建一個專用的檢查 VPC，多個 VPC 透過 **Transit Gateway** 把流量繞進去檢查。TGW attachment 要開 **appliance mode**，確保同一條連線的去回程走同一個 AZ |
+| **入站檢查** | 在 IGW 的路由表（edge association／ingress routing）把進入 public subnet 的流量先導到 firewall endpoint |
+| **出站檢查** | private subnet → firewall endpoint → NAT gateway → IGW，在出口前做網域與威脅過濾 |
+| **East-West 檢查** | VPC 之間、VPC 與地端（經 DX／VPN）之間的流量經 TGW 導入檢查 |
+
+### 使用情境
+
+- **出站網域白名單**：private subnet 的 EC2 只能連到核准的軟體儲存庫或 SaaS 網址，其他網際網路流量一律封鎖（Q327）。
+- **取代地端防火牆或 IPS 設備**：把地端的流量檢測與過濾功能搬到 VPC，又不想自己管理設備（Q15）。
+- **法規或稽核要求**：金融業要求所有進出流量都要經過防火牆檢查並留下紀錄。
+- **集中式網路安全**：在網路帳號建一個 inspection VPC，統一檢查所有應用 VPC 的南北向與東西向流量。
+- **阻擋已知惡意目的地**：套用受管威脅情資規則，阻擋連往惡意網域或 C&C 伺服器的連線。
+
+### 和其他安全服務的比較
+
+| 服務 | 層級 | 作用範圍 | 用途 |
+|---|---|---|---|
+| Security Group | L4，有狀態 | ENI／instance | 只能寫放行規則，管某台機器能接受哪些連線 |
+| Network ACL | L4，無狀態 | Subnet | 可以寫放行與拒絕規則，例如封鎖特定 IP |
+| **Network Firewall** | L3–L7，有狀態＋無狀態 | VPC 流量（經路由導入） | 網域過濾、IPS、深度封包檢測、集中管控 |
+| AWS WAF | L7 HTTP | ALB、CloudFront、API Gateway 等 | SQL injection、XSS、bot、rate limit 等 Web 攻擊 |
+| Route 53 Resolver DNS Firewall | DNS 查詢 | VPC 的 DNS 解析 | 阻擋解析惡意網域，但繞過 DNS 直接連 IP 時無效 |
+| Shield | L3／L4（Advanced 含 L7） | 對外資源 | DDoS 防護 |
+| GWLB＋第三方設備 | L3 | VPC 流量 | 想沿用 Palo Alto、Fortinet 等既有廠牌設備時 |
+
+### 容易混淆的地方
+
+- **Network Firewall 和 WAF 不能互相取代**：Web 應用的 SQL injection、XSS 防護選 WAF（Q732）；VPC 層級的流量過濾、IPS、出站網域控管選 Network Firewall。
+- **Network Firewall 和 GWLB 的差別**：兩者都能做集中式檢查。要 AWS 託管、不想管設備就用 Network Firewall；指定要用第三方廠牌的虛擬防火牆就用 GWLB（Q19、Q945）。Network Firewall 底層其實也使用 GWLB 技術。
+- **一定要改路由表**：只建立防火牆不會有任何效果，流量必須透過路由表導進 firewall endpoint。
+- **SG 和 NACL 做不到網域過濾**：它們只認 IP、port 與協定；要依網域名稱放行出站流量，就要用 Network Firewall 或 proxy。
+- **DNS Firewall 和 Network Firewall 是互補的**：DNS Firewall 只管 DNS 查詢；Network Firewall 檢查實際的連線流量。
+
+### 考試判斷重點
+
+- 「inspect / filter traffic」「IPS／IDS」「only allow outbound to approved domains／URLs」「centralized inspection」，而且「AWS managed」「最少維運」→ **AWS Network Firewall**。
+- 「third-party firewall appliances」→ **GWLB**。
+- 「SQL injection、XSS、Web 攻擊」→ **WAF**。
+- 「多帳號統一防火牆政策」→ **Firewall Manager**（可以管理 Network Firewall、WAF、Shield Advanced、Security Group 政策）。
+
+**相關題號**
+- 選 Network Firewall：Q15、Q327
+- 改選其他服務：Q732（WAF）、Q19、Q945（GWLB＋第三方設備）
+
+---
+
 ## 更新紀錄
 
 - 2026-11-14：建立文件，收錄 AWS Config、S3 Glacier Deep Archive、S3 IA、RPO 與 RTO。
 - 2026-11-14：新增「Elastic Load Balancing（ALB、NLB、GWLB、CLB）」。
+- 2026-11-15：新增「AWS Network Firewall」。
