@@ -3978,7 +3978,7 @@ aws iam list-users --query 'Users[].UserName'      # 應只剩 saa-admin（以�
 | 「不管伺服器跑容器」 | ECS / EKS on Fargate |
 | 「RTO/RPO 最小、成本最高」 | Multi-Site Active/Active；成本低到高：Backup & Restore → Pilot Light → Warm Standby → Active/Active |
 
-更多練習題請見 [`docs/practice-questions.md`](docs/practice-questions.md)；常見觀念（AWS Config、S3 Glacier Deep Archive、S3 IA、RPO/RTO 等）的釐清整理在 [`docs/concept-clarification.md`](docs/concept-clarification.md)。
+更多練習題請見 [`docs/practice-questions.md`](docs/practice-questions.md)；常見觀念（AWS Config、S3 Glacier Deep Archive、S3 IA、RPO/RTO、Load Balancer 等）的釐清整理在 [`docs/concept-clarification.md`](docs/concept-clarification.md)。
 
 ---
 

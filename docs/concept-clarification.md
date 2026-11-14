@@ -10,6 +10,7 @@
 2. [S3 Glacier Deep Archive](#2-s3-glacier-deep-archive)
 3. [S3 Infrequent Access（Standard-IA 與 One Zone-IA）](#3-s3-infrequent-accessstandard-ia-與-one-zone-ia)
 4. [RPO 與 RTO](#4-rpo-與-rto)
+5. [Elastic Load Balancing（ALB、NLB、GWLB、CLB）](#5-elastic-load-balancingalbnlbgwlbclb)
 
 ---
 
@@ -237,6 +238,126 @@ RPO 和 RTO 越小成本越高，所以要選「**剛好滿足**業務要求」�
 
 ---
 
+## 5. Elastic Load Balancing（ALB、NLB、GWLB、CLB）
+
+### 一句話定位
+
+Elastic Load Balancing（ELB）是託管的負載平衡服務，負責把流量分散到多個 AZ 的 target，並透過健康檢查只把流量送給健康的 target。四種類型的差別在於**工作在哪一層、看得懂多少流量內容**。
+
+| 類型 | OSI 層 | 看得懂什麼 | 一句話 |
+|---|---|---|---|
+| **ALB**（Application Load Balancer） | L7 | HTTP/HTTPS 的路徑、主機名稱、header、query string | Web 與微服務的智慧路由 |
+| **NLB**（Network Load Balancer） | L4 | TCP/UDP/TLS 的 IP 與 port | 極高效能、低延遲、固定 IP |
+| **GWLB**（Gateway Load Balancer） | L3 | IP 封包（以 GENEVE 封裝） | 把流量透明地送進第三方防火牆或檢測設備 |
+| **CLB**（Classic Load Balancer） | L4／L7 | 基本 HTTP 與 TCP | 舊一代，新架構不使用 |
+
+### ALB（L7）
+
+| 項目 | 內容 |
+|---|---|
+| 協定 | HTTP、HTTPS、HTTP/2、gRPC、WebSocket |
+| 路由規則 | 依 path（`/api/*`）、host（`api.example.com`）、header、method、query string、來源 IP 轉送到不同 target group |
+| Target 類型 | EC2 instance、IP（含地端，經 DX/VPN）、**Lambda**、ECS task、EKS pod |
+| 內建動作 | HTTP 轉 HTTPS 的 **redirect**、固定回應（fixed response）、**Cognito／OIDC 使用者驗證** |
+| TLS | 搭配 ACM 憑證做 **SSL offloading**；用 **SNI** 在同一個 listener 掛多張憑證 |
+| 安全 | 可掛 **AWS WAF**（SQL injection、XSS、geo match、rate-based、IP set）；有 security group |
+| Session | Sticky session（cookie） |
+| 用戶端 IP | 後端看到的是 ALB 的 IP，原始 IP 放在 `X-Forwarded-For` header |
+| IP 位址 | **沒有固定 IP**，只能用 DNS 名稱存取 |
+
+**使用情境**
+
+- 一般 Web 應用與 REST API，前面通常再加 CloudFront。
+- 微服務與容器：依路徑或主機名稱把請求導到不同服務（ECS、EKS 的 Ingress）。
+- 需要 WAF 防護、HTTP 轉 HTTPS、統一登入驗證時。
+- Serverless：ALB 直接呼叫 Lambda。
+
+### NLB（L4）
+
+| 項目 | 內容 |
+|---|---|
+| 協定 | TCP、UDP、TCP_UDP、TLS |
+| 效能 | 每秒可處理數百萬個請求，延遲極低，可應付突發流量 |
+| 固定 IP | 每個 AZ 一個**固定 IP**，也可以綁 **Elastic IP**，方便用戶端防火牆設白名單 |
+| Target 類型 | EC2 instance、IP（含地端）、**ALB**（讓 ALB 也能有固定 IP） |
+| 用戶端 IP | 保留原始來源 IP（client IP preservation） |
+| TLS | 可以在 NLB 終結 TLS（掛 ACM 憑證），也可以直接 TCP 透傳到後端 |
+| 安全 | 新建的 NLB 可以掛 security group（建立時就要設定）；**不支援 WAF** |
+| PrivateLink | **VPC endpoint service 必須以 NLB（或 GWLB）為前端**，是跨帳號、跨 VPC 私有提供服務的標準作法 |
+
+**使用情境**
+
+- **UDP** 服務：遊戲、VoIP、IoT、DNS、串流。ALB 不支援 UDP。
+- 非 HTTP 的 TCP 服務、非標準 port、極高吞吐量。
+- 用戶端只能連白名單中的**固定 IP**。
+- 透過 **PrivateLink** 把服務私有地提供給其他 VPC 或其他帳號。
+- 搭配 Global Accelerator，提供全球 TCP/UDP 的低延遲入口。
+
+### GWLB（L3）
+
+| 項目 | 內容 |
+|---|---|
+| 用途 | 把流量導向第三方虛擬設備（防火牆、IDS/IPS、深度封包檢測），並在設備之間分散負載 |
+| 運作方式 | 以 **GENEVE 協定（UDP 6081）** 封裝原始封包送到設備，設備檢查後送回，對來源與目的端透明 |
+| 搭配元件 | **Gateway Load Balancer Endpoint（GWLBE）**，放在要保護的 VPC，路由表把流量指向它 |
+| 架構 | 常見做法是集中式的 inspection VPC 或安全帳號，多個應用 VPC／帳號共用一組設備 |
+
+**使用情境**
+
+- 所有進出流量都要先經過 Palo Alto、Fortinet 等**第三方防火牆**。
+- 集中在網路或安全帳號做檢測，同時讓設備可以水平擴展、高可用。
+
+### CLB（舊一代）
+
+同時支援基本的 L4 與 L7，但沒有路徑路由、Lambda target、WAF 等功能。新架構一律選 ALB 或 NLB，考題中 CLB 通常是要被替換的對象。
+
+### 共通功能
+
+| 功能 | 說明 |
+|---|---|
+| 健康檢查 | ALB 用 HTTP/HTTPS 檢查特定路徑與狀態碼；NLB 可用 TCP、HTTP、HTTPS。只有 HTTP 健康檢查才偵測得到應用層錯誤（Q70） |
+| 搭配 Auto Scaling | ASG 掛 target group 後，新 instance 自動註冊；ASG 健康檢查改用 **ELB 類型**，不健康的 instance 才會被替換 |
+| 跨 AZ 負載平衡 | ALB 預設開啟；NLB、GWLB 預設關閉，開啟後跨 AZ 傳輸要計費 |
+| Deregistration delay | 舊稱 connection draining，移除 target 時先讓進行中的請求完成 |
+| Security group 串接 | 後端 EC2 的 SG 只允許「來源為 LB 的 SG」，就能擋掉其他直接連線（Q282） |
+| Internet-facing 與 internal | 對外的 LB 放 public subnet，後端 EC2 可放在 private subnet（Q697） |
+
+### 怎麼選
+
+| 題目線索 | 選擇 |
+|---|---|
+| HTTP/HTTPS、依 path 或 host 路由、微服務、容器 | ALB |
+| 需要 WAF、HTTP 轉 HTTPS、Cognito 登入、Lambda target | ALB |
+| UDP、非 HTTP 的 TCP、每秒數百萬請求、超低延遲 | NLB |
+| 固定 IP、Elastic IP、用戶端防火牆白名單 | NLB（或 Global Accelerator） |
+| PrivateLink、跨帳號私有提供服務 | NLB |
+| 第三方防火牆、IDS/IPS、流量透明檢測 | GWLB |
+| 全球使用者、TCP/UDP、anycast 靜態 IP、快速跨 Region 容錯 | Global Accelerator（後端接 NLB 或 ALB） |
+| 全球使用者、HTTP 內容快取 | CloudFront（origin 為 ALB 或 S3） |
+
+### 容易混淆的地方
+
+- **WAF 不能掛在 NLB 上**：WAF 只能掛在 ALB、CloudFront、API Gateway、AppSync、Cognito user pool 等。NLB 遇到 Web 攻擊要在前面加 API Gateway 或 CloudFront 再掛 WAF（Q180）。
+- **ALB 沒有固定 IP**：要固定 IP，可以在 ALB 前面放 NLB（ALB-type target）或 Global Accelerator。
+- **Route 53 不是負載平衡器**：Route 53 回傳的 IP 可能已經不健康而且有 DNS 快取；要確實只送到健康的 instance，應在前面放 ALB（Q264）。
+- **Global Accelerator 和 NLB 不是二選一**：Global Accelerator 是全球入口，負責導到最近、健康的 Region；Region 內仍由 NLB 或 ALB 分散流量（Q461、Q700）。
+- **SSL offloading 用 ALB 加 ACM**：讓 EC2 不必處理加解密（Q123）。注意外部 CA 簽發後匯入 ACM 的憑證不會自動續約（Q62）。
+
+### 考試判斷重點
+
+1. 先看**協定**：有 UDP 就排除 ALB，選 NLB。
+2. 再看**需求**：路由規則、WAF、驗證選 ALB；固定 IP、PrivateLink、極高吞吐量選 NLB；第三方設備檢測選 GWLB。
+3. 高可用題型的標準答案通常是「**ELB＋跨多個 AZ 的 ASG**」，而且 ASG 要使用 ELB 健康檢查。
+
+**相關題號**
+- ALB：Q12、Q60、Q62、Q70、Q112、Q123、Q141、Q170、Q213、Q264、Q282、Q340、Q437、Q591、Q608、Q697
+- NLB：Q367、Q378、Q382、Q600、Q642、Q704、Q744、Q810、Q876、Q928、Q987
+- NLB 搭配 Global Accelerator：Q461、Q700、Q905
+- GWLB：Q19、Q945
+
+---
+
 ## 更新紀錄
 
 - 2026-11-14：建立文件，收錄 AWS Config、S3 Glacier Deep Archive、S3 IA、RPO 與 RTO。
+- 2026-11-14：新增「Elastic Load Balancing（ALB、NLB、GWLB、CLB）」。
